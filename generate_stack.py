@@ -170,6 +170,7 @@ def render_stack_public(stack: StackSpec) -> dict:
     """Build a JSON-safe, non-secret summary of the stack for operators."""
     return {
         "owner_telegram_id": stack.owner_telegram_id,
+        "audit_group_chat_id": stack.audit_group_chat_id,
         "llm_provider": stack.llm_provider,
         "agents": [
             {

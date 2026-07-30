@@ -32,7 +32,8 @@ Interactive `make setup` / `setup_agents.py` must ask:
 
 1. How many agents? (min 2)
 2. Authorized human Telegram **numeric** user id (with tip for @userinfobot)
-3. Whether to use DeepSeek as the model provider (default yes)
+3. Optional shared Telegram **group chat id** (supergroup `-100...`; required for group replies)
+4. Whether to use DeepSeek as the model provider (default yes)
 4. If DeepSeek: API key (hidden), same-settings-for-all?, default model choice,
    max context window tokens (default 128000, max 1000000)
 5. Telegram bot token per agent

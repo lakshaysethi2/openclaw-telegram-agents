@@ -30,6 +30,7 @@ def test_prompt_stack_with_deepseek(monkeypatch: object) -> None:
         [
             "2",
             "424242",
+            "AUDIT_GROUP_CHAT_ID",  # group id
             "y",  # use deepseek
             "y",  # same settings
             "",  # model default flash
@@ -54,6 +55,7 @@ def test_prompt_stack_with_deepseek(monkeypatch: object) -> None:
     )
     assert len(stack.agents) == 2
     assert stack.owner_telegram_id == "424242"
+    assert stack.audit_group_chat_id == "AUDIT_GROUP_CHAT_ID"
     assert stack.llm_provider == "deepseek"
     assert stack.agents[0].telegram_bot_token == "111:AAA"
     assert stack.agents[0].provider_api_key == "sk-deepseek-test-key"
@@ -102,6 +104,7 @@ def test_prompt_stack_skip_llm() -> None:
         [
             "2",
             "99",
+            "",  # skip group id
             "n",  # skip deepseek
             "",  # persona 1
             "",  # persona 2

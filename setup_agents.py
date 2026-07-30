@@ -105,6 +105,21 @@ def prompt_stack(
     owner_raw = input_fn("Your Telegram numeric user id (not @username): ").strip()
     owner_id = require_numeric_id(owner_raw, field_name="owner_telegram_id")
 
+    print("\nShared Telegram group (optional but required for group chat replies).")
+    print("  Supergroup ids look like -100xxxxxxxxxx (not the short basic-group id).")
+    print("  Tip: add the bots, send a message, then read make logs for Group migrated / chat id.")
+    print("  Leave empty to keep placeholder AUDIT_GROUP_CHAT_ID (group replies stay blocked).")
+    group_raw = input_fn("Audit/group chat id [-100... or empty]: ").strip()
+    if group_raw:
+        group_id = require_numeric_id(group_raw, field_name="audit_group_chat_id")
+        if not group_id.startswith("-"):
+            print(
+                "  WARNING: group chat ids are usually negative "
+                "(supergroups often start with -100)."
+            )
+    else:
+        group_id = "AUDIT_GROUP_CHAT_ID"
+
     provider, api_key, models, contexts = prompt_llm_settings(
         agent_count=count,
         input_fn=input_fn,
@@ -168,6 +183,7 @@ def prompt_stack(
         contexts=contexts,
         bot_labels=bot_labels,
     )
+    print(f"  audit_group_chat_id: {group_id}")
     if not prompt_yes_no("Write compose + agent files now?", default=True, input_fn=input_fn):
         raise ValidationError(
             "Setup cancelled before writing files.",
@@ -178,6 +194,7 @@ def prompt_stack(
     return StackSpec(
         agents=tuple(agents),
         owner_telegram_id=owner_id,
+        audit_group_chat_id=group_id,
         llm_provider=provider,
     )
 
@@ -215,6 +232,12 @@ def print_next_steps(stack: StackSpec) -> None:
         )
     step += 1
     print(f"  {step}) make logs SERVICE=<target_agent>   # watch inbound / model turn")
+    print("\nGroup chat tips:")
+    print(f"  - Configured group id: {stack.audit_group_chat_id}")
+    print("  - groupPolicy=allowlist requires the real -100... id under channels.telegram.groups")
+    print("  - With requireMention=true, message must @mention the bot username")
+    print("  - Example: @your_bot_username hello")
+    print("  - BotFather: /setprivacy -> Disable if bots must see non-mention group traffic")
     print("\nTip: make test-a2a FROM=agent-1   # auto-picks the other bot if only 2 agents")
     print("Never commit agents/*/.env files.")
 

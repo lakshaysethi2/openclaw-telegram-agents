@@ -132,9 +132,13 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
               allowFrom: [
                 {allow_lines}
               ],
+              // groupPolicy=allowlist blocks ALL groups until a real chat id is listed.
+              // Supergroup keys look like "-100xxxxxxxxxx" (not AUDIT_GROUP_CHAT_ID).
               groupPolicy: "allowlist",
               groups: {{
                 "{group_id}": {{
+                  // Plain group text is ignored while requireMention is true.
+                  // Test with: @bot_username hello
                   requireMention: true,
                   allowFrom: [
                     {allow_lines}
