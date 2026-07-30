@@ -11,12 +11,15 @@ from textwrap import dedent
 
 from lib_models import AgentSpec, StackSpec
 
-DENIED_A2A_TOOLS: tuple[str, ...] = (
-    "sessions_send",
-    "sessions_spawn",
+# Tools that look like a second agent-bus. Keep denied so Telegram stays the
+# only cross-*agent* path. Same-agent session tools stay available (each agent
+# runs in its own container, so sessions_* only sees that agent's sessions).
+DENIED_CROSS_AGENT_TOOLS: tuple[str, ...] = (
     "conversations_send",
     "conversations_turn",
 )
+# Back-compat alias used by tests/docs imports.
+DENIED_A2A_TOOLS: tuple[str, ...] = DENIED_CROSS_AGENT_TOOLS
 
 
 def _model_defaults_block(agent: AgentSpec) -> str:
@@ -80,7 +83,7 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
     """Render JSON5 openclaw.json for one agent."""
     allow_from = stack.peer_ids_for(agent)
     allow_lines = ",\n                ".join(f'"{item}"' for item in allow_from)
-    deny_lines = ",\n              ".join(f'"{item}"' for item in DENIED_A2A_TOOLS)
+    deny_lines = ",\n              ".join(f'"{item}"' for item in DENIED_CROSS_AGENT_TOOLS)
     origins = [
         f"http://127.0.0.1:{agent.host_port}",
         f"http://localhost:{agent.host_port}",
@@ -150,6 +153,17 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
           }},
 
           tools: {{
+            // Each gateway is one agent in its own container. Allow that agent
+            // to list/read/send across its OWN sessions (DM vs group, etc.).
+            // Default OpenClaw visibility is "tree" (current + subagents only),
+            // which hides sibling sessions and causes "I don't remember that".
+            sessions: {{
+              visibility: "agent",
+            }},
+            // Still block gateway multi-agent routing if ever misconfigured.
+            agentToAgent: {{
+              enabled: false,
+            }},
             deny: [
               {deny_lines}
             ],
@@ -217,7 +231,10 @@ def render_identity_md(agent: AgentSpec, stack: StackSpec) -> str:
         {persona}
 
         - Peer agents ({peers}) are reached only over Telegram bot-to-bot messages.
-        - Do not use internal OpenClaw session/delegation tools for peer agents.
+        - This container holds only {agent.name}. Use sessions_list + sessions_history
+          when the human asks about something from another of YOUR chats/sessions
+          (for example a group vs a DM). Those tools see this agent's sessions only.
+        - Do not invent a path to peer agent internals; peers are other bots on Telegram.
         - Owner Telegram numeric id is allowlisted for human control.
         {model_line}
         {ctx_line}

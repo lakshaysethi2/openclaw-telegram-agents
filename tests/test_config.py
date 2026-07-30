@@ -54,11 +54,19 @@ def test_openclaw_json_allowlist_peers_and_owner() -> None:
 
 
 def test_openclaw_json_denies_internal_a2a_tools() -> None:
-    """Internal multi-agent tools must be denied so Telegram stays the bus."""
+    """Cross-agent bus tools stay denied; own-session visibility is agent-wide."""
     stack = _stack()
     text = render_openclaw_json(stack, stack.agents[1])
     for tool in DENIED_A2A_TOOLS:
         assert f'"{tool}"' in text
+    assert 'visibility: "agent"' in text
+    assert "agentToAgent" in text
+    assert "enabled: false" in text
+    # Same-agent recall tools must NOT be blanket-denied.
+    assert '"sessions_list"' not in text.split("deny:", 1)[1]
+    assert '"sessions_history"' not in text.split("deny:", 1)[1]
+    assert '"sessions_send"' not in text.split("deny:", 1)[1]
+    assert '"sessions_spawn"' not in text.split("deny:", 1)[1]
 
 
 def test_openclaw_json_deepseek_model_and_context() -> None:

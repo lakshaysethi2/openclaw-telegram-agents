@@ -84,7 +84,8 @@ Hard isolation:
 
 - one Docker network per agent
 - no shared volumes between agents
-- internal OpenClaw A2A tools denied
+- cross-agent gateway routing off (`agentToAgent.enabled=false`); Telegram is the peer bus
+- same-agent session recall on (`tools.sessions.visibility=agent`) so DM/group context can be shared inside one container
 - no Redis / no docker.sock / no host network
 
 ## Configuration

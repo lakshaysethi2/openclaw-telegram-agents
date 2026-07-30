@@ -11,9 +11,11 @@ Human operators and smaller AI agents should be able to `git pull` and run
 1. **Telegram is the only agent <-> agent bus.**
 2. **Never** add shared Docker networks, Redis, shared volumes, HTTP between
    agents, or Docker socket mounts.
-3. **Never** enable OpenClaw internal A2A tools:
-   `sessions_send`, `sessions_spawn`, `conversations_send`, `conversations_turn`
-   (they stay in `tools.deny`).
+3. **Telegram is the only cross-agent path.** Keep `tools.agentToAgent.enabled=false`
+   and deny `conversations_send` / `conversations_turn`. Same-agent session tools
+   (`sessions_list`, `sessions_history`, optional `sessions_send`/`sessions_spawn`)
+   are allowed because each agent is an isolated container - set
+   `tools.sessions.visibility: "agent"` so DM/group/cron sessions can recall each other.
 4. **Never invent config keys** such as `botToBot: true` or Telegram `allowBots`.
    Peer bots are admitted via numeric `allowFrom` + BotFather bot-to-bot opt-in.
 5. **Never commit secrets or operator identity.** Gitignore covers

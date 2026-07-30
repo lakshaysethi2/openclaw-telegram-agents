@@ -51,10 +51,14 @@
   },
   "tools": {
     "deny": [
-      "sessions_send",
-      "sessions_spawn",
       "conversations_send",
       "conversations_turn"
-    ]
+    ],
+    "sessions": {
+      "visibility": "agent"
+    },
+    "agentToAgent": {
+      "enabled": false
+    }
   }
 }

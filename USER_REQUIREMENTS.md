@@ -13,8 +13,12 @@ only over Telegram bot-to-bot messaging. Default bootstrap is 2 agents
 1. Separate per agent: state, workspace, auth, Telegram token, gateway token,
    provider env, Docker network, host port.
 2. Telegram is the only agent <-> agent path.
-3. Forbidden paths: internal A2A tools, Redis, HTTP between containers, shared
-   files between agents, shared Docker network, docker.sock, host network.
+3. Forbidden paths: Redis, HTTP between containers, shared files between agents,
+   shared Docker network, docker.sock, host network, and gateway multi-agent
+   routing (`tools.agentToAgent.enabled=false`). Same-agent session tools are
+   allowed inside each container (`tools.sessions.visibility: "agent"`) so an
+   agent can recall its own other sessions (DM vs group). Do not deny
+   `sessions_list` / `sessions_history`.
 4. No real tokens in git. Placeholders only in committed files.
    Also never commit real Telegram user ids, bot ids, group chat ids, or bot usernames.
    Live `agents/*/state/openclaw.json` and `agents/stack-public.json` stay local/gitignored.
@@ -56,7 +60,9 @@ dirs + live `.env` files (including `DEEPSEEK_API_KEY` when chosen), set
 - Networks: `openclaw-agent-N-net` (one each)
 - Healthcheck: `/healthz`
 - Heartbeat: `every: "0m"`
-- tools.deny: sessions_send, sessions_spawn, conversations_send, conversations_turn
+- tools.sessions.visibility: `agent` (own sessions visible across DM/group)
+- tools.agentToAgent.enabled: false
+- tools.deny: conversations_send, conversations_turn
 - Identity file: `workspace/IDENTITY.md` (not `agents.entries` on 2026.6.34)
 
 ## Allowlist policy
