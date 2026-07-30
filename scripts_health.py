@@ -2,12 +2,15 @@
 
 Parses published host ports from the compose file text (simple regex) so this
 stays dependency-free and easy for smaller AI agents to follow.
+
+Retries briefly after make up because gateways need a few seconds to bind.
 """
 
 from __future__ import annotations
 
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -15,6 +18,8 @@ from lib_logging import log_error, setup_logging
 from lib_paths import compose_path, repo_root
 
 PORT_RE = re.compile(r'"(\d+):18789"')
+DEFAULT_ATTEMPTS = 12
+DEFAULT_DELAY_SEC = 2.0
 
 
 def published_host_ports(compose_text: str) -> list[int]:
@@ -52,6 +57,18 @@ def check_healthz(port: int, timeout_sec: float = 3.0) -> tuple[bool, str]:
         return False, f"{url} -> {type(exc).__name__}: {exc}"
 
 
+def check_all_ports(ports: list[int]) -> tuple[bool, list[str]]:
+    """Probe every port once. Returns (all_ok, detail_lines)."""
+    details: list[str] = []
+    all_ok = True
+    for port in ports:
+        ok, detail = check_healthz(port)
+        details.append(("OK  " if ok else "FAIL") + " " + detail)
+        if not ok:
+            all_ok = False
+    return all_ok, details
+
+
 def main() -> int:
     """CLI entry: return 0 when every discovered port is healthy."""
     logger = setup_logging()
@@ -75,25 +92,28 @@ def main() -> int:
         )
         return 2
 
-    failed = False
-    for port in ports:
-        ok, detail = check_healthz(port)
-        print(("OK  " if ok else "FAIL") + " " + detail)
-        if not ok:
-            failed = True
+    last_details: list[str] = []
+    for attempt in range(1, DEFAULT_ATTEMPTS + 1):
+        all_ok, last_details = check_all_ports(ports)
+        if all_ok:
+            for line in last_details:
+                print(line)
+            print(f"All healthy: {ports}")
+            return 0
+        if attempt < DEFAULT_ATTEMPTS:
+            print(f"Waiting for gateways (attempt {attempt}/{DEFAULT_ATTEMPTS})...")
+            time.sleep(DEFAULT_DELAY_SEC)
 
-    if failed:
-        log_error(
-            logger,
-            "One or more health checks failed.",
-            code="HEALTH_FAILED",
-            hint="Run: make ps && make logs   Ensure make up completed.",
-            context={"ports": ports},
-        )
-        return 1
-
-    print(f"All healthy: {ports}")
-    return 0
+    for line in last_details:
+        print(line)
+    log_error(
+        logger,
+        "One or more health checks failed.",
+        code="HEALTH_FAILED",
+        hint="Run: make ps && make logs   Ensure make up completed.",
+        context={"ports": ports, "attempts": DEFAULT_ATTEMPTS},
+    )
+    return 1
 
 
 if __name__ == "__main__":

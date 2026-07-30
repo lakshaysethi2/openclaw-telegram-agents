@@ -16,7 +16,8 @@ TO_USER ?=
 SERVICE ?=
 
 .PHONY: help setup generate up down restart ps logs pull config health \
-	test lint fmt test-a2a enable-deepseek clean chown-agents fix-perms doctor
+	test lint fmt test-a2a enable-deepseek enable_deepseek clean \
+	chown-agents fix-perms doctor
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n" } \
@@ -30,6 +31,7 @@ generate: ## Non-interactive default 2-agent placeholder stack
 
 up: fix-perms ## Start all agent gateways
 	docker compose up -d
+	@echo "up: started. Tip: make health (retries until ready)"
 
 down: ## Stop and remove containers/networks
 	docker compose down
@@ -66,13 +68,15 @@ fmt: ## Auto-format Python with ruff
 	docker run --rm -v "$(ROOT):/app" -w /app $(PY_IMAGE) \
 		sh -c "pip install -q -r requirements-dev.txt && ruff check --fix . && ruff format ."
 
-test-a2a: ## Manual Telegram transport test (FROM=agent-1 TO_USER=bot_username)
-	@if [ -z "$(TO_USER)" ]; then echo "Usage: make test-a2a FROM=agent-1 TO_USER=target_bot_username" >&2; exit 2; fi
+test-a2a: ## Telegram A2A test (FROM=agent-1 TO_USER=optional; auto-picks peer)
 	@chmod +x ./test_a2a.sh
 	./test_a2a.sh "$(FROM)" "$(TO_USER)"
 
 enable-deepseek: ## Install DeepSeek provider plugin inside each running agent
-	$(PY_RUN) python enable_deepseek.py
+	@# Must run on host (needs docker CLI); do not wrap in python container.
+	python3 enable_deepseek.py
+
+enable_deepseek: enable-deepseek ## Alias for enable-deepseek (underscore)
 
 chown-agents: fix-perms ## Alias for fix-perms
 

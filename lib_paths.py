@@ -60,6 +60,11 @@ def compose_path(root: Path | None = None) -> Path:
     return base / "docker-compose.yml"
 
 
+def stack_public_path(root: Path | None = None) -> Path:
+    """Return non-secret stack metadata path (usernames, ports, models)."""
+    return agents_root(root) / "stack-public.json"
+
+
 def agent_slug(index: int) -> str:
     """Build the canonical agent directory/service name from a 1-based index."""
     if index < 1:

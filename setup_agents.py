@@ -190,14 +190,33 @@ def print_next_steps(stack: StackSpec) -> None:
     print("  1) In BotFather, enable Bot-to-Bot Communication for EVERY bot.")
     print("  2) make up")
     print("  3) make health")
+    step = 4
     if stack.uses_deepseek():
-        print("  4) make enable-deepseek   # install official DeepSeek plugin in each agent")
-        print("  5) make test-a2a FROM=agent-1 TO_USER=<agent_2_bot_username>")
-        print("  6) make logs SERVICE=agent-2")
+        print(f"  {step}) make enable-deepseek   # or: make enable_deepseek")
+        step += 1
     else:
-        print("  4) Add a model provider key in agents/*/.env then restart: make restart")
-        print("  5) make test-a2a FROM=agent-1 TO_USER=<agent_2_bot_username>")
-    print("\nNever commit agents/*/.env files.")
+        print(f"  {step}) Add a model provider key in agents/*/.env then: make restart")
+        step += 1
+
+    print(f"  {step}) Copy-paste Telegram A2A tests (usernames from getMe):")
+    printed = False
+    for src in stack.agents:
+        for dst in stack.agents:
+            if src.name == dst.name:
+                continue
+            if not dst.bot_username:
+                continue
+            print(f"       make test-a2a FROM={src.name} TO_USER={dst.bot_username}")
+            printed = True
+    if not printed:
+        print(
+            "       make test-a2a FROM=agent-1 TO_USER=<peer_bot_username>"
+            "   # getMe did not return a username"
+        )
+    step += 1
+    print(f"  {step}) make logs SERVICE=<target_agent>   # watch inbound / model turn")
+    print("\nTip: make test-a2a FROM=agent-1   # auto-picks the other bot if only 2 agents")
+    print("Never commit agents/*/.env files.")
 
 
 def main() -> int:

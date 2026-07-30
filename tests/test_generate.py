@@ -17,6 +17,7 @@ def test_write_stack_files_creates_two_agent_layout(tmp_path: Path) -> None:
     assert (tmp_path / "agents" / "agent-2" / "state" / "openclaw.json").is_file()
     assert (tmp_path / "agents" / "agent-1" / ".env").is_file()
     assert (tmp_path / "agents" / "agent-2" / ".env.example").is_file()
+    assert (tmp_path / "agents" / "stack-public.json").is_file()
     assert len(written) >= 8
 
 
@@ -61,6 +62,38 @@ def test_prompt_stack_with_deepseek(monkeypatch: object) -> None:
     assert stack.agents[0].persona == "researcher"
     assert stack.agents[1].persona == "writer"
     assert stack.agents[1].host_port == 18790
+
+
+def test_stack_public_includes_test_commands(tmp_path: Path) -> None:
+    """stack-public.json must list copy-paste test-a2a commands with usernames."""
+    import json
+
+    from lib_models import AgentSpec, StackSpec
+
+    a1 = AgentSpec(
+        index=1,
+        name="agent-1",
+        host_port=18789,
+        telegram_bot_token="t1",
+        gateway_token="g1",
+        bot_numeric_id="111",
+        bot_username="bot_one",
+    )
+    a2 = AgentSpec(
+        index=2,
+        name="agent-2",
+        host_port=18790,
+        telegram_bot_token="t2",
+        gateway_token="g2",
+        bot_numeric_id="222",
+        bot_username="bot_two",
+    )
+    stack = StackSpec(agents=(a1, a2), owner_telegram_id="9")
+    write_stack_files(stack, root=tmp_path, write_live_env=False)
+    data = json.loads((tmp_path / "agents" / "stack-public.json").read_text())
+    assert "make test-a2a FROM=agent-1 TO_USER=bot_two" in data["test_a2a_commands"]
+    assert "make test-a2a FROM=agent-2 TO_USER=bot_one" in data["test_a2a_commands"]
+    assert "t1" not in json.dumps(data)
 
 
 def test_prompt_stack_skip_llm() -> None:

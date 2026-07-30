@@ -1,64 +1,104 @@
 {
-    // agent-1 - isolated OpenClaw gateway.
-    // Tokens come from agents/agent-1/.env (never commit real tokens).
-    // allowFrom uses numeric Telegram ids only (owner + peer bot ids).
-
-    gateway: {
-      mode: "local",
-      bind: "lan",
-      auth: { mode: "token" },
-      controlUi: {
-        allowedOrigins: [
-          "http://127.0.0.1:18789",
-  "http://localhost:18789"
-        ],
-      },
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "auth": {
+      "mode": "token"
     },
-
-    agents: {
-      defaults: {
-        workspace: "/home/node/.openclaw/workspace",
-        heartbeat: { every: "0m" },
-        // model: { primary: "openai/gpt-5.5" },
-      },
-    },
-
-    channels: {
-      defaults: {
-        botLoopProtection: {
-          enabled: true,
-          maxEventsPerWindow: 20,
-          windowSeconds: 60,
-          cooldownSeconds: 60,
-        },
-      },
-      telegram: {
-        enabled: true,
-        dmPolicy: "allowlist",
-        allowFrom: [
-          "YOUR_TELEGRAM_USER_ID",
-  "PEER_BOT_NUMERIC_ID"
-        ],
-        groupPolicy: "allowlist",
-        groups: {
-          "AUDIT_GROUP_CHAT_ID": {
-            requireMention: true,
-            allowFrom: [
-              "YOUR_TELEGRAM_USER_ID",
-  "PEER_BOT_NUMERIC_ID"
+    "controlUi": {
+      "allowedOrigins": [
+        "http://127.0.0.1:18789",
+        "http://localhost:18789"
+      ]
+    }
+  },
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "deepseek": {
+        "baseUrl": "https://api.deepseek.com",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "deepseek-v4-flash",
+            "name": "DeepSeek V4 Flash",
+            "input": [
+              "text"
             ],
+            "contextWindow": 1000000,
+            "maxTokens": 384000
           },
-        },
-        historyLimit: 0,
+          {
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek V4 Pro",
+            "input": [
+              "text"
+            ],
+            "contextWindow": 1000000,
+            "maxTokens": 384000
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/home/node/.openclaw/workspace",
+      "heartbeat": {
+        "every": "0m"
       },
+      "model": {
+        "primary": "deepseek/deepseek-v4-flash"
+      },
+      "contextTokens": 128000
+    }
+  },
+  "channels": {
+    "defaults": {
+      "botLoopProtection": {
+        "enabled": true,
+        "maxEventsPerWindow": 20,
+        "windowSeconds": 60,
+        "cooldownSeconds": 60
+      }
     },
-
-    tools: {
-      deny: [
-        "sessions_send",
-"sessions_spawn",
-"conversations_send",
-"conversations_turn"
+    "telegram": {
+      "enabled": true,
+      "dmPolicy": "allowlist",
+      "allowFrom": [
+        "YOUR_TELEGRAM_USER_ID",
+        "PEER_BOT_NUMERIC_ID"
       ],
-    },
+      "groupPolicy": "allowlist",
+      "groups": {
+        "AUDIT_GROUP_CHAT_ID": {
+          "requireMention": true,
+          "allowFrom": [
+            "YOUR_TELEGRAM_USER_ID",
+            "PEER_BOT_NUMERIC_ID"
+          ]
+        }
+      },
+      "historyLimit": 0
+    }
+  },
+  "tools": {
+    "deny": [
+      "sessions_send",
+      "sessions_spawn",
+      "conversations_send",
+      "conversations_turn"
+    ]
+  },
+  "plugins": {
+    "entries": {
+      "deepseek": {
+        "enabled": true
+      }
+    }
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.6.34",
+    "lastTouchedAt": "2026-07-30T03:42:45.481Z"
   }
+}

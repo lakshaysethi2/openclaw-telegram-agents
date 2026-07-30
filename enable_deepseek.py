@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Install the official DeepSeek provider plugin into each agent container.
 
-Safe to re-run. Does not print API keys. Prefer: make enable-deepseek
+Must run on the host (needs the docker CLI). Prefer: make enable-deepseek
+Safe to re-run. Does not print API keys.
 """
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -37,23 +39,20 @@ def agent_service_names(compose_text: str) -> list[str]:
 
 def install_for_service(service: str) -> int:
     """Run openclaw plugins install inside one compose service."""
-    cmd = [
-        "docker",
-        "compose",
-        "exec",
-        "-T",
-        service,
-        "node",
-        "dist/index.js",
-        "plugins",
-        "install",
-        "@openclaw/deepseek-provider",
-    ]
-    print(f"==> {service}: installing @openclaw/deepseek-provider")
-    proc = subprocess.run(cmd, cwd=str(repo_root()), check=False)
-    if proc.returncode != 0:
-        # Fallback when gateway process owns the CLI differently.
-        alt = [
+    attempts = [
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            service,
+            "node",
+            "dist/index.js",
+            "plugins",
+            "install",
+            "@openclaw/deepseek-provider",
+        ],
+        [
             "docker",
             "compose",
             "exec",
@@ -63,15 +62,43 @@ def install_for_service(service: str) -> int:
             "plugins",
             "install",
             "@openclaw/deepseek-provider",
-        ]
-        print(f"==> {service}: retry via openclaw CLI")
-        proc = subprocess.run(alt, cwd=str(repo_root()), check=False)
-    return proc.returncode
+        ],
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            service,
+            "npx",
+            "--yes",
+            "openclaw",
+            "plugins",
+            "install",
+            "@openclaw/deepseek-provider",
+        ],
+    ]
+    for idx, cmd in enumerate(attempts, start=1):
+        label = " ".join(cmd[5:])
+        print(f"==> {service}: try {idx}: {label}")
+        proc = subprocess.run(cmd, cwd=str(repo_root()), check=False)
+        if proc.returncode == 0:
+            print(f"==> {service}: OK")
+            return 0
+    return 1
 
 
 def main() -> int:
     """Install DeepSeek plugin for every agent-* service."""
     logger = setup_logging()
+    if shutil.which("docker") is None:
+        log_error(
+            logger,
+            "docker CLI not found on PATH.",
+            code="NO_DOCKER",
+            hint="Run on the host: make enable-deepseek  (not inside a container)",
+        )
+        return 2
+
     compose = Path(repo_root()) / "docker-compose.yml"
     if not compose.is_file():
         log_error(
@@ -94,23 +121,39 @@ def main() -> int:
 
     failed = False
     for service in services:
+        # Ensure service is running before exec.
+        ps = subprocess.run(
+            ["docker", "compose", "ps", "--status", "running", "--services"],
+            cwd=str(repo_root()),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        running = {line.strip() for line in (ps.stdout or "").splitlines() if line.strip()}
+        if service not in running:
+            print(f"FAIL: {service} is not running. Run: make up", file=sys.stderr)
+            failed = True
+            continue
         code = install_for_service(service)
         if code != 0:
             failed = True
-            print(f"FAIL: {service} plugin install exited {code}", file=sys.stderr)
+            print(f"FAIL: {service} plugin install failed", file=sys.stderr)
 
     if failed:
         log_error(
             logger,
             "One or more DeepSeek plugin installs failed.",
             code="DEEPSEEK_PLUGIN_FAIL",
-            hint="make up && make enable-deepseek   Ensure DEEPSEEK_API_KEY is in agents/*/.env",
+            hint=(
+                "make up && make enable-deepseek. "
+                "Ensure DEEPSEEK_API_KEY is in agents/*/.env. "
+                "If the plugin CLI is unavailable, model catalog is still in openclaw.json."
+            ),
         )
         return 1
 
     print("DeepSeek plugin install attempted for:", ", ".join(services))
     print("Restart gateways: make restart && make health")
-    print("Verify: docker compose exec agent-1 openclaw models list --provider deepseek")
     return 0
 
 

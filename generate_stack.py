@@ -10,6 +10,7 @@ Example:
 from __future__ import annotations
 
 import argparse
+import json
 import secrets
 import sys
 from pathlib import Path
@@ -34,6 +35,7 @@ from lib_paths import (
     compose_path,
     openclaw_config_path,
     repo_root,
+    stack_public_path,
 )
 
 
@@ -152,7 +154,42 @@ def write_stack_files(
             env_live.write_text(render_agent_env(agent, example=False), encoding="utf-8")
             written.append(env_live)
 
+    # Non-secret operator metadata for copy-paste make test-a2a commands.
+    public_path = stack_public_path(base)
+    public_path.parent.mkdir(parents=True, exist_ok=True)
+    public_path.write_text(
+        json.dumps(render_stack_public(stack), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    written.append(public_path)
+
     return written
+
+
+def render_stack_public(stack: StackSpec) -> dict:
+    """Build a JSON-safe, non-secret summary of the stack for operators."""
+    return {
+        "owner_telegram_id": stack.owner_telegram_id,
+        "llm_provider": stack.llm_provider,
+        "agents": [
+            {
+                "name": agent.name,
+                "host_port": agent.host_port,
+                "bot_numeric_id": agent.bot_numeric_id,
+                "bot_username": agent.bot_username,
+                "model_primary": agent.model_primary,
+                "context_tokens": agent.context_tokens,
+                "persona": agent.persona,
+            }
+            for agent in stack.agents
+        ],
+        "test_a2a_commands": [
+            f"make test-a2a FROM={src.name} TO_USER={dst.bot_username}"
+            for src in stack.agents
+            for dst in stack.agents
+            if src.name != dst.name and dst.bot_username
+        ],
+    }
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

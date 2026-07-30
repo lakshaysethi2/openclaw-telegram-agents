@@ -2,6 +2,8 @@
 .env
 **/.env
 !**/.env.example
+# Live operator metadata (bot usernames from setup); not a secret but local
+agents/stack-public.json
 *.pem
 *.key
 credentials/
