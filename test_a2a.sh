@@ -13,73 +13,21 @@ cd "$ROOT_DIR"
 
 FROM_SERVICE="${1:-${FROM:-agent-1}}"
 RAW_USERNAME="${2:-${TO_USER:-}}"
-PUBLIC_JSON="${ROOT_DIR}/agents/stack-public.json"
 
-print_known_commands() {
-  if [[ -f "${PUBLIC_JSON}" ]]; then
-    docker run --rm -v "${ROOT_DIR}:/app" -w /app python:3.11-slim \
-      python - <<'PY'
-import json
-from pathlib import Path
-path = Path("agents/stack-public.json")
-data = json.loads(path.read_text(encoding="utf-8"))
-cmds = data.get("test_a2a_commands") or []
-agents = data.get("agents") or []
-print("Known agents (from setup getMe / stack-public.json):")
-for a in agents:
-    uname = a.get("bot_username") or "(no username)"
-    print(f"  - {a.get('name')}: @{uname} id={a.get('bot_numeric_id')}")
-if cmds:
-    print("Copy-paste tests:")
-    for c in cmds:
-        print(f"  {c}")
-else:
-    print("No bot usernames stored. Re-run: make setup")
-PY
-  else:
-    echo "No agents/stack-public.json yet. Re-run: make setup" >&2
-    echo "Usage: $0 <from_service> <to_bot_username>" >&2
-  fi
+py_public() {
+  docker run --rm -v "${ROOT_DIR}:/app" -w /app python:3.11-slim \
+    python lib_stack_public.py "$@"
 }
 
-resolve_to_user() {
-  # When TO_USER is empty, pick the only other agent username if possible.
-  if [[ -n "${RAW_USERNAME}" ]]; then
-    return 0
-  fi
-  if [[ ! -f "${PUBLIC_JSON}" ]]; then
-    echo "ERROR: TO_USER not set and agents/stack-public.json missing." >&2
-    print_known_commands
-    exit 2
-  fi
-  RAW_USERNAME="$(
-    docker run --rm -v "${ROOT_DIR}:/app" -w /app -e FROM_SERVICE="${FROM_SERVICE}" \
-      python:3.11-slim python - <<'PY'
-import json, os
-from pathlib import Path
-from_name = os.environ["FROM_SERVICE"]
-data = json.loads(Path("agents/stack-public.json").read_text(encoding="utf-8"))
-peers = [
-    a for a in data.get("agents") or []
-    if a.get("name") != from_name and a.get("bot_username")
-]
-if len(peers) == 1:
-    print(peers[0]["bot_username"])
-elif len(peers) == 0:
-    raise SystemExit(0)
-else:
-    raise SystemExit(0)
-PY
-  )"
+if [[ -z "${RAW_USERNAME}" ]]; then
+  RAW_USERNAME="$(py_public peer "${FROM_SERVICE}" | tr -d '\r' | tail -n 1)"
   if [[ -z "${RAW_USERNAME}" ]]; then
     echo "ERROR: TO_USER not set and could not auto-pick a single peer." >&2
-    print_known_commands
+    py_public list
     exit 2
   fi
   echo "Auto-selected TO_USER=${RAW_USERNAME} (from agents/stack-public.json)"
-}
-
-resolve_to_user
+fi
 
 USERNAME_NO_AT="${RAW_USERNAME#@}"
 CHAT_ID="@${USERNAME_NO_AT}"
@@ -140,27 +88,15 @@ if [[ "${OK_FIELD}" != "true" ]]; then
   exit 1
 fi
 
-TARGET_SERVICE=""
-if [[ -f "${PUBLIC_JSON}" ]]; then
-  TARGET_SERVICE="$(
-    docker run --rm -v "${ROOT_DIR}:/app" -w /app -e TO_USER="${USERNAME_NO_AT}" \
-      python:3.11-slim python - <<'PY'
-import json, os
-from pathlib import Path
-want = os.environ["TO_USER"].lstrip("@").lower()
-data = json.loads(Path("agents/stack-public.json").read_text(encoding="utf-8"))
-for a in data.get("agents") or []:
-    if str(a.get("bot_username") or "").lstrip("@").lower() == want:
-        print(a.get("name") or "")
-        break
-PY
-  )"
+TARGET_SERVICE="$(py_public service "${USERNAME_NO_AT}" | tr -d '\r' | tail -n 1)"
+if [[ -z "${TARGET_SERVICE}" ]]; then
+  TARGET_SERVICE="agent-2"
 fi
 
 cat <<EOF
 RESULT: stage 1 OK (Telegram accepted sendMessage).
 Next stages (manual):
-  2) OpenClaw inbound on target: make logs SERVICE=${TARGET_SERVICE:-agent-2}
+  2) OpenClaw inbound on target: make logs SERVICE=${TARGET_SERVICE}
   3) Model turn (needs provider key + make enable-deepseek on target)
   4) Target reply message (e.g. A2A_ACK)
 Do not widen allowlists to wildcards if stage 1 passes but later stages fail.
