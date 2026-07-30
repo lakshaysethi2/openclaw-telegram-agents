@@ -2,7 +2,7 @@
 .env
 **/.env
 !**/.env.example
-# Live operator metadata (bot usernames from setup); not a secret but local
+# Live operator metadata (bot usernames/ids from setup) - never commit
 agents/stack-public.json
 *.pem
 *.key
@@ -24,8 +24,11 @@ build/
 # OpenClaw runtime (keep committed templates only)
 agents/*/auth/**
 !agents/*/auth/.gitkeep
+# Live state is local-only (contains Telegram user/bot/group ids).
+# Commit only openclaw.json.example placeholders under agents/*/state/.
 agents/*/state/**
-!agents/*/state/openclaw.json
+!agents/*/state/.gitkeep
+!agents/*/state/openclaw.json.example
 agents/*/workspace/**
 !agents/*/workspace/IDENTITY.md
 !agents/*/workspace/.gitkeep

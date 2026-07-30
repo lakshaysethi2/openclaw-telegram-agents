@@ -16,6 +16,8 @@ only over Telegram bot-to-bot messaging. Default bootstrap is 2 agents
 3. Forbidden paths: internal A2A tools, Redis, HTTP between containers, shared
    files between agents, shared Docker network, docker.sock, host network.
 4. No real tokens in git. Placeholders only in committed files.
+   Also never commit real Telegram user ids, bot ids, group chat ids, or bot usernames.
+   Live `agents/*/state/openclaw.json` and `agents/stack-public.json` stay local/gitignored.
 5. No automatic live Telegram send on compose build/start.
 6. Do not invent OpenClaw keys (`botToBot`, Telegram `allowBots`).
 7. No wildcard Telegram allowlists.

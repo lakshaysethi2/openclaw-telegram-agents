@@ -8,39 +8,8 @@
     "controlUi": {
       "allowedOrigins": [
         "http://127.0.0.1:18790",
-        "http://localhost:18790",
-        "http://127.0.0.1:18789",
-        "http://localhost:18789"
+        "http://localhost:18790"
       ]
-    }
-  },
-  "models": {
-    "mode": "merge",
-    "providers": {
-      "deepseek": {
-        "baseUrl": "https://api.deepseek.com",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "deepseek-v4-flash",
-            "name": "DeepSeek V4 Flash",
-            "input": [
-              "text"
-            ],
-            "contextWindow": 1000000,
-            "maxTokens": 384000
-          },
-          {
-            "id": "deepseek-v4-pro",
-            "name": "DeepSeek V4 Pro",
-            "input": [
-              "text"
-            ],
-            "contextWindow": 1000000,
-            "maxTokens": 384000
-          }
-        ]
-      }
     }
   },
   "agents": {
@@ -48,11 +17,7 @@
       "workspace": "/home/node/.openclaw/workspace",
       "heartbeat": {
         "every": "0m"
-      },
-      "model": {
-        "primary": "deepseek/deepseek-v4-flash"
-      },
-      "contextTokens": 128000
+      }
     }
   },
   "channels": {
@@ -91,16 +56,5 @@
       "conversations_send",
       "conversations_turn"
     ]
-  },
-  "plugins": {
-    "entries": {
-      "deepseek": {
-        "enabled": true
-      }
-    }
-  },
-  "meta": {
-    "lastTouchedVersion": "2026.6.34",
-    "lastTouchedAt": "2026-07-30T03:49:44.613Z"
   }
 }

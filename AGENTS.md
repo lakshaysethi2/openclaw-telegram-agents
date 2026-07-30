@@ -16,7 +16,11 @@ Human operators and smaller AI agents should be able to `git pull` and run
    (they stay in `tools.deny`).
 4. **Never invent config keys** such as `botToBot: true` or Telegram `allowBots`.
    Peer bots are admitted via numeric `allowFrom` + BotFather bot-to-bot opt-in.
-5. **Never commit secrets.** `agents/*/.env` is gitignored.
+5. **Never commit secrets or operator identity.** Gitignore covers
+   `agents/*/.env`, live `agents/*/state/openclaw.json`, and
+   `agents/stack-public.json`. Do **not** commit real Telegram user ids,
+   bot ids, group ids, bot usernames, tokens, or API keys. Use placeholders
+   like `YOUR_TELEGRAM_USER_ID`, `PEER_BOT_NUMERIC_ID`, `AUDIT_GROUP_CHAT_ID`.
 6. **Never print bot tokens** in logs, tests, or README examples.
 7. **Never call `getUpdates`** while a gateway long-polls that bot.
 8. **No wildcard allowlists** (`*`) for Telegram dm/group policy.
