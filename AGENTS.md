@@ -61,6 +61,7 @@ make test          # REQUIRED before claiming done
 make lint          # REQUIRED before claiming done
 make doctor        # config + lint + test
 make test-a2a FROM=agent-1 TO_USER=other_bot_username
+make enable-deepseek   # after make up, if DeepSeek was configured
 ```
 
 Before every PR or handoff:
@@ -74,8 +75,10 @@ make doctor
 1. `StackSpec` / `AgentSpec` in `lib_models.py` validate inputs.
 2. `lib_compose.py` renders isolated services + networks.
 3. `lib_config.py` renders `openclaw.json`, env examples, IDENTITY.md.
-4. `generate_stack.py` writes files non-interactively.
-5. `setup_agents.py` prompts humans and can call Telegram `getMe`.
+4. `lib_setup.py` holds interactive DeepSeek/model/context prompts.
+5. `generate_stack.py` writes files non-interactively.
+6. `setup_agents.py` prompts humans and can call Telegram `getMe`.
+7. `enable_deepseek.py` installs `@openclaw/deepseek-provider` per agent.
 
 If you change rendered output, update unit tests in `tests/` in the same change.
 
@@ -89,6 +92,8 @@ If you change rendered output, update unit tests in `tests/` in the same change.
 - Heartbeat off: `agents.defaults.heartbeat.every: "0m"`
 - Gateway token via env `OPENCLAW_GATEWAY_TOKEN`
 - Telegram token via env `TELEGRAM_BOT_TOKEN`
+- DeepSeek: env `DEEPSEEK_API_KEY`, model refs `deepseek/deepseek-v4-flash` or
+  `deepseek/deepseek-v4-pro`, runtime cap `agents.defaults.contextTokens`
 
 ## Allowlist rules
 

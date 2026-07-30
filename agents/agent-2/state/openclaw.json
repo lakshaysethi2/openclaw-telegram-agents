@@ -38,16 +38,16 @@
         enabled: true,
         dmPolicy: "allowlist",
         allowFrom: [
-          "OWNER_TELEGRAM_ID",
-  "REPLACE_WITH_AGENT_1_BOT_NUMERIC_ID"
+          "YOUR_TELEGRAM_USER_ID",
+  "PEER_BOT_NUMERIC_ID"
         ],
         groupPolicy: "allowlist",
         groups: {
           "AUDIT_GROUP_CHAT_ID": {
             requireMention: true,
             allowFrom: [
-              "OWNER_TELEGRAM_ID",
-  "REPLACE_WITH_AGENT_1_BOT_NUMERIC_ID"
+              "YOUR_TELEGRAM_USER_ID",
+  "PEER_BOT_NUMERIC_ID"
             ],
           },
         },

@@ -16,13 +16,13 @@ TO_USER ?=
 SERVICE ?=
 
 .PHONY: help setup generate up down restart ps logs pull config health \
-	test lint fmt test-a2a clean chown-agents fix-perms doctor
+	test lint fmt test-a2a enable-deepseek clean chown-agents fix-perms doctor
 
 help: ## Show available targets
 	@awk 'BEGIN {FS = ":.*##"; printf "Targets:\n" } \
 		/^[a-zA-Z0-9_.-]+:.*##/ { printf "  %-16s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-setup: ## Interactive setup (agent count, tokens, owner id)
+setup: ## Interactive setup (agents, tokens, owner id, optional DeepSeek)
 	$(PY_RUN_TTY) python setup_agents.py
 
 generate: ## Non-interactive default 2-agent placeholder stack
@@ -70,6 +70,9 @@ test-a2a: ## Manual Telegram transport test (FROM=agent-1 TO_USER=bot_username)
 	@if [ -z "$(TO_USER)" ]; then echo "Usage: make test-a2a FROM=agent-1 TO_USER=target_bot_username" >&2; exit 2; fi
 	@chmod +x ./test_a2a.sh
 	./test_a2a.sh "$(FROM)" "$(TO_USER)"
+
+enable-deepseek: ## Install DeepSeek provider plugin inside each running agent
+	$(PY_RUN) python enable_deepseek.py
 
 chown-agents: fix-perms ## Alias for fix-perms
 

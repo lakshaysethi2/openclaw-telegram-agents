@@ -32,11 +32,20 @@ make ps
 
 1. Ask how many agents (min 2)
 2. Ask for your **numeric** Telegram user id (not `@username`)
-3. Ask for one **BotFather token** per agent (hidden input)
-4. Call Telegram `getMe` to resolve each bot numeric id/username when possible
-5. Write `docker-compose.yml`, `agents/agent-N/**`, and gitignored `.env` files
+3. Ask whether to use **DeepSeek** (API key, default model, context window)
+4. Ask for one **BotFather token** per agent (hidden input)
+5. Optionally set a short persona/role per agent
+6. Call Telegram `getMe` to resolve each bot numeric id/username when possible
+7. Show a redacted summary and write `docker-compose.yml`, `agents/agent-N/**`, `.env`
 
-Then enable **Bot-to-Bot Communication** for every bot in BotFather.
+Then:
+
+```bash
+# BotFather: enable Bot-to-Bot Communication for every bot
+make up
+make enable-deepseek   # if DeepSeek was chosen during setup
+make health
+```
 
 ### Placeholder demo (no real tokens)
 
@@ -60,6 +69,7 @@ make health     # gateways live; Telegram channel will 404 until real tokens
 | `make lint` | Ruff in Docker |
 | `make doctor` | config + lint + test |
 | `make test-a2a FROM=agent-1 TO_USER=other_bot` | Manual Telegram transport test |
+| `make enable-deepseek` | Install DeepSeek provider plugin in each agent |
 
 ## Architecture
 
@@ -92,10 +102,16 @@ Hard isolation:
 ```bash
 TELEGRAM_BOT_TOKEN=123456:ABC...     # BotFather token for THIS agent
 OPENCLAW_GATEWAY_TOKEN=long-random   # Gateway Control UI / API auth
-# OPENAI_API_KEY=...                 # optional model provider
+DEEPSEEK_API_KEY=sk-...              # set by make setup when DeepSeek is chosen
+# OPENAI_API_KEY=...                 # alternative providers
 # ANTHROPIC_API_KEY=...
 # OPENROUTER_API_KEY=...
 ```
+
+When DeepSeek is enabled, `openclaw.json` also sets:
+
+- `agents.defaults.model.primary` (e.g. `deepseek/deepseek-v4-flash`)
+- `agents.defaults.contextTokens` (runtime context cap; default `128000`)
 
 Root `.env.example` documents the image pin and points at per-agent token files.
 

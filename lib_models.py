@@ -25,6 +25,16 @@ class ValidationError(ValueError):
         self.hint = hint
 
 
+# Known DeepSeek model refs (OpenClaw provider docs, 2026.7).
+DEEPSEEK_MODEL_CHOICES: tuple[tuple[str, str], ...] = (
+    ("deepseek/deepseek-v4-flash", "Fast V4 (default; good cost/latency)"),
+    ("deepseek/deepseek-v4-pro", "Stronger V4 (higher quality, higher cost)"),
+)
+DEEPSEEK_DEFAULT_MODEL = DEEPSEEK_MODEL_CHOICES[0][0]
+DEEPSEEK_DEFAULT_CONTEXT_TOKENS = 128_000
+DEEPSEEK_MAX_CONTEXT_TOKENS = 1_000_000
+
+
 @dataclass(frozen=True)
 class AgentSpec:
     """One independent OpenClaw gateway agent.
@@ -38,6 +48,10 @@ class AgentSpec:
         bot_numeric_id: Telegram bot id from getMe, or placeholder.
         bot_username: Telegram bot username without @, or empty.
         provider_api_key: Optional model provider key (placeholder allowed).
+        provider_name: Provider id such as ``deepseek``, or empty.
+        model_primary: OpenClaw model ref ``provider/model``, or empty.
+        context_tokens: Optional runtime context cap (agents.defaults.contextTokens).
+        persona: Optional one-line role text for IDENTITY.md.
     """
 
     index: int
@@ -48,6 +62,10 @@ class AgentSpec:
     bot_numeric_id: str
     bot_username: str = ""
     provider_api_key: str = ""
+    provider_name: str = ""
+    model_primary: str = ""
+    context_tokens: int | None = None
+    persona: str = ""
 
     def to_public_dict(self) -> dict[str, Any]:
         """Return a JSON-safe dict with secrets removed."""
@@ -69,6 +87,7 @@ class StackSpec:
         openclaw_image: Container image reference.
         base_port: Host port for agent-1 (defaults to 18789).
         audit_group_chat_id: Optional shared audit supergroup id.
+        llm_provider: Shared provider id when setup chose one (e.g. deepseek).
     """
 
     agents: tuple[AgentSpec, ...]
@@ -76,6 +95,7 @@ class StackSpec:
     openclaw_image: str = "ghcr.io/openclaw/openclaw:latest"
     base_port: int = 18789
     audit_group_chat_id: str = "AUDIT_GROUP_CHAT_ID"
+    llm_provider: str = ""
 
     def __post_init__(self) -> None:
         """Validate minimum size and unique ports/names."""
@@ -108,6 +128,12 @@ class StackSpec:
                 peers.append(other.bot_numeric_id)
         return peers
 
+    def uses_deepseek(self) -> bool:
+        """True when any agent is configured for the DeepSeek provider."""
+        if self.llm_provider == "deepseek":
+            return True
+        return any(a.provider_name == "deepseek" for a in self.agents)
+
     def to_public_dict(self) -> dict[str, Any]:
         """Return a redacted dict suitable for structured logs."""
         return {
@@ -116,6 +142,7 @@ class StackSpec:
             "openclaw_image": self.openclaw_image,
             "base_port": self.base_port,
             "audit_group_chat_id": self.audit_group_chat_id,
+            "llm_provider": self.llm_provider,
             "agents": [a.to_public_dict() for a in self.agents],
         }
 
@@ -151,16 +178,31 @@ def parse_positive_int(raw: str, *, field_name: str, minimum: int = 1) -> int:
     return value
 
 
-def require_non_empty(raw: str, *, field_name: str) -> str:
-    """Strip and require a non-empty string.
+def parse_context_tokens(raw: str, *, field_name: str = "context_tokens") -> int:
+    """Parse a context window cap within DeepSeek-safe bounds.
 
     Args:
-        raw: Raw user input.
+        raw: Raw token count string.
         field_name: Name used in errors.
 
     Returns:
-        Stripped string.
+        Integer token cap between 1024 and DEEPSEEK_MAX_CONTEXT_TOKENS.
     """
+    value = parse_positive_int(raw, field_name=field_name, minimum=1024)
+    if value > DEEPSEEK_MAX_CONTEXT_TOKENS:
+        raise ValidationError(
+            f"{field_name} must be <= {DEEPSEEK_MAX_CONTEXT_TOKENS}, got {value}.",
+            code="CONTEXT_TOO_LARGE",
+            hint=(
+                f"DeepSeek V4 native window is {DEEPSEEK_MAX_CONTEXT_TOKENS}. "
+                f"Use a smaller runtime cap (default {DEEPSEEK_DEFAULT_CONTEXT_TOKENS})."
+            ),
+        )
+    return value
+
+
+def require_non_empty(raw: str, *, field_name: str) -> str:
+    """Strip and require a non-empty string."""
     value = str(raw).strip()
     if not value:
         raise ValidationError(
@@ -172,15 +214,7 @@ def require_non_empty(raw: str, *, field_name: str) -> str:
 
 
 def require_numeric_id(raw: str, *, field_name: str) -> str:
-    """Require a numeric Telegram id string (digits only, optional leading -).
-
-    Args:
-        raw: Raw id input.
-        field_name: Name used in errors.
-
-    Returns:
-        Normalized id string.
-    """
+    """Require a numeric Telegram id string (digits only, optional leading -)."""
     value = require_non_empty(raw, field_name=field_name)
     body = value[1:] if value.startswith("-") else value
     if not body.isdigit():
@@ -194,6 +228,22 @@ def require_numeric_id(raw: str, *, field_name: str) -> str:
             ),
         )
     return value
+
+
+def parse_yes_no(raw: str, *, default: bool) -> bool:
+    """Parse a yes/no answer with a default when empty."""
+    value = str(raw).strip().lower()
+    if not value:
+        return default
+    if value in {"y", "yes", "true", "1"}:
+        return True
+    if value in {"n", "no", "false", "0"}:
+        return False
+    raise ValidationError(
+        f"Expected yes/no, got {raw!r}.",
+        code="INPUT_NOT_YES_NO",
+        hint="Answer y or n (or press Enter for the default).",
+    )
 
 
 def mapping_get_str(data: Mapping[str, Any], key: str, default: str = "") -> str:

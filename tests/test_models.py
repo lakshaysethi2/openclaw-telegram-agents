@@ -8,7 +8,9 @@ from lib_models import (
     AgentSpec,
     StackSpec,
     ValidationError,
+    parse_context_tokens,
     parse_positive_int,
+    parse_yes_no,
     require_numeric_id,
 )
 
@@ -70,3 +72,21 @@ def test_public_dict_redacts_secrets() -> None:
     assert "token-1" not in blob
     assert "gateway-1" not in blob
     assert "***REDACTED***" in blob
+
+
+def test_parse_context_tokens_bounds() -> None:
+    """Context window must stay within safe runtime bounds."""
+    assert parse_context_tokens("128000") == 128000
+    with pytest.raises(ValidationError) as exc:
+        parse_context_tokens("100")
+    assert exc.value.code == "INPUT_TOO_SMALL"
+    with pytest.raises(ValidationError) as exc2:
+        parse_context_tokens("5000000")
+    assert exc2.value.code == "CONTEXT_TOO_LARGE"
+
+
+def test_parse_yes_no_defaults() -> None:
+    """Empty yes/no answers use the provided default."""
+    assert parse_yes_no("", default=True) is True
+    assert parse_yes_no("n", default=True) is False
+    assert parse_yes_no("YES", default=False) is True

@@ -1,6 +1,6 @@
 """Generate per-agent OpenClaw config, env files, and workspace identity.
 
-Uses only keys verified against OpenClaw 2026.6.34. Does not invent
+Uses only keys verified against OpenClaw 2026.6.34+. Does not invent
 Telegram ``allowBots`` / ``botToBot`` keys. Does not use ``agents.entries``
 (rejected by that image's config validator).
 """
@@ -19,27 +19,79 @@ DENIED_A2A_TOOLS: tuple[str, ...] = (
 )
 
 
-def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
-    """Render JSON5 openclaw.json for one agent.
+def _model_defaults_block(agent: AgentSpec) -> str:
+    """Render optional model + contextTokens inside agents.defaults."""
+    lines: list[str] = [
+        'workspace: "/home/node/.openclaw/workspace",',
+        'heartbeat: { every: "0m" },',
+    ]
+    if agent.model_primary:
+        lines.append(f'model: {{ primary: "{agent.model_primary}" }},')
+    else:
+        lines.append('// model: { primary: "deepseek/deepseek-v4-flash" },')
+    if agent.context_tokens and agent.context_tokens > 0:
+        lines.append(f"contextTokens: {agent.context_tokens},")
+    return "\n              ".join(lines)
 
-    Args:
-        stack: Full stack (needed for peer allowlists).
-        agent: Target agent.
 
-    Returns:
-        JSON5 document text.
+def _deepseek_provider_block(agent: AgentSpec) -> str:
+    """Optional models.providers.deepseek catalog for Docker without npm plugin.
+
+    Official path still prefers ``@openclaw/deepseek-provider`` (make enable-deepseek).
+    This explicit provider block keeps OpenAI-compatible DeepSeek usable even if
+    the plugin is not installed yet.
     """
+    if agent.provider_name != "deepseek":
+        return ""
+    # contextWindow is the model native window; agents.defaults.contextTokens caps runtime.
+    return dedent(
+        """
+          models: {
+            mode: "merge",
+            providers: {
+              deepseek: {
+                // Auth: process env DEEPSEEK_API_KEY from agents/<name>/.env
+                baseUrl: "https://api.deepseek.com",
+                api: "openai-completions",
+                models: [
+                  {
+                    id: "deepseek-v4-flash",
+                    name: "DeepSeek V4 Flash",
+                    input: ["text"],
+                    contextWindow: 1000000,
+                    maxTokens: 384000,
+                  },
+                  {
+                    id: "deepseek-v4-pro",
+                    name: "DeepSeek V4 Pro",
+                    input: ["text"],
+                    contextWindow: 1000000,
+                    maxTokens: 384000,
+                  },
+                ],
+              },
+            },
+          },
+        """
+    ).rstrip()
+
+
+def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
+    """Render JSON5 openclaw.json for one agent."""
     allow_from = stack.peer_ids_for(agent)
-    allow_lines = ",\n        ".join(f'"{item}"' for item in allow_from)
-    deny_lines = ",\n      ".join(f'"{item}"' for item in DENIED_A2A_TOOLS)
+    allow_lines = ",\n                ".join(f'"{item}"' for item in allow_from)
+    deny_lines = ",\n              ".join(f'"{item}"' for item in DENIED_A2A_TOOLS)
     origins = [
         f"http://127.0.0.1:{agent.host_port}",
         f"http://localhost:{agent.host_port}",
     ]
     if agent.host_port != 18789:
         origins.extend(["http://127.0.0.1:18789", "http://localhost:18789"])
-    origin_lines = ",\n        ".join(f'"{o}"' for o in origins)
+    origin_lines = ",\n                ".join(f'"{o}"' for o in origins)
     group_id = stack.audit_group_chat_id
+    model_block = _model_defaults_block(agent)
+    provider_block = _deepseek_provider_block(agent)
+    provider_section = f"\n{provider_block}\n" if provider_block else "\n"
     return (
         dedent(
             f"""
@@ -58,12 +110,10 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
               ],
             }},
           }},
-
+          {provider_section}
           agents: {{
             defaults: {{
-              workspace: "/home/node/.openclaw/workspace",
-              heartbeat: {{ every: "0m" }},
-              // model: {{ primary: "openai/gpt-5.5" }},
+              {model_block}
             }},
           }},
 
@@ -108,15 +158,7 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
 
 
 def render_agent_env(agent: AgentSpec, *, example: bool = False) -> str:
-    """Render ``.env`` or ``.env.example`` body for one agent.
-
-    Args:
-        agent: Agent specification.
-        example: When True, force placeholder-style values for commits.
-
-    Returns:
-        dotenv file text.
-    """
+    """Render ``.env`` or ``.env.example`` body for one agent."""
     token = (
         f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_TELEGRAM_BOT_TOKEN"
         if example
@@ -127,41 +169,54 @@ def render_agent_env(agent: AgentSpec, *, example: bool = False) -> str:
         if example
         else agent.gateway_token
     )
-    provider = (
-        "REPLACE_WITH_PROVIDER_API_KEY"
-        if example or not agent.provider_api_key
-        else agent.provider_api_key
-    )
-    return (
-        dedent(
-            f"""
-        # Secrets for {agent.name}. Real .env is gitignored.
-        # TELEGRAM_BOT_TOKEN is the BotFather token for this agent only.
-        TELEGRAM_BOT_TOKEN={token}
-        OPENCLAW_GATEWAY_TOKEN={gateway}
-        # Model provider key (uncomment the provider you use):
-        # OPENAI_API_KEY={provider}
-        # ANTHROPIC_API_KEY={provider}
-        # OPENROUTER_API_KEY={provider}
-        """
-        ).strip()
-        + "\n"
-    )
+    lines = [
+        f"# Secrets for {agent.name}. Real .env is gitignored.",
+        "# TELEGRAM_BOT_TOKEN is the BotFather token for this agent only.",
+        f"TELEGRAM_BOT_TOKEN={token}",
+        f"OPENCLAW_GATEWAY_TOKEN={gateway}",
+    ]
+    if agent.provider_name == "deepseek" or agent.model_primary.startswith("deepseek/"):
+        if example:
+            lines.append("DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY")
+        elif agent.provider_api_key:
+            lines.append(f"DEEPSEEK_API_KEY={agent.provider_api_key}")
+        else:
+            lines.append("# DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY")
+    else:
+        lines.append("# Model provider key (uncomment the provider you use):")
+        lines.append("# DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY")
+        lines.append("# OPENAI_API_KEY=REPLACE_WITH_PROVIDER_API_KEY")
+        lines.append("# ANTHROPIC_API_KEY=REPLACE_WITH_PROVIDER_API_KEY")
+        lines.append("# OPENROUTER_API_KEY=REPLACE_WITH_PROVIDER_API_KEY")
+    return "\n".join(lines) + "\n"
 
 
 def render_identity_md(agent: AgentSpec, stack: StackSpec) -> str:
     """Render workspace IDENTITY.md for one agent."""
     peers = ", ".join(a.name for a in stack.agents if a.name != agent.name)
+    persona = agent.persona.strip() or "Independent OpenClaw agent in a multi-agent Telegram mesh."
+    model_line = (
+        f"- Default model: `{agent.model_primary}`"
+        if agent.model_primary
+        else "- Default model: not set yet (configure provider in .env / openclaw.json)."
+    )
+    ctx_line = (
+        f"- Context token cap: {agent.context_tokens}"
+        if agent.context_tokens
+        else "- Context token cap: provider/model default."
+    )
     return (
         dedent(
             f"""
         # {agent.name}
 
-        Independent OpenClaw agent in a multi-agent Telegram mesh.
+        {persona}
 
         - Peer agents ({peers}) are reached only over Telegram bot-to-bot messages.
         - Do not use internal OpenClaw session/delegation tools for peer agents.
         - Owner Telegram numeric id is allowlisted for human control.
+        {model_line}
+        {ctx_line}
         """
         ).strip()
         + "\n"
@@ -177,11 +232,13 @@ def render_root_env_example(stack: StackSpec) -> str:
         "# Optional: default owner id documented for operators (not read by compose).",
         f"# OWNER_TELEGRAM_ID={stack.owner_telegram_id}",
         "",
-        "# Per-agent Telegram bot tokens live in agents/<name>/.env",
+        "# Per-agent secrets live in agents/<name>/.env",
         "# Example keys (filled by make setup / setup_agents.py):",
     ]
     for agent in stack.agents:
         lines.append(f"# agents/{agent.name}/.env -> TELEGRAM_BOT_TOKEN=...")
         lines.append(f"# agents/{agent.name}/.env -> OPENCLAW_GATEWAY_TOKEN=...")
+        if stack.uses_deepseek():
+            lines.append(f"# agents/{agent.name}/.env -> DEEPSEEK_API_KEY=...")
     lines.append("")
     return "\n".join(lines)

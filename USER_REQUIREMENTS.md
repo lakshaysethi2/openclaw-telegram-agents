@@ -31,11 +31,18 @@ only over Telegram bot-to-bot messaging. Default bootstrap is 2 agents
 Interactive `make setup` / `setup_agents.py` must ask:
 
 1. How many agents? (min 2)
-2. Authorized human Telegram **numeric** user id
-3. Telegram bot token per agent
+2. Authorized human Telegram **numeric** user id (with tip for @userinfobot)
+3. Whether to use DeepSeek as the model provider (default yes)
+4. If DeepSeek: API key (hidden), same-settings-for-all?, default model choice,
+   max context window tokens (default 128000, max 1000000)
+5. Telegram bot token per agent
+6. Optional short persona/role per agent (IDENTITY.md)
+7. Redacted summary + confirm before write
 
 It should resolve bot ids via `getMe` when network allows, write compose + agent
-dirs + live `.env` files, and print next steps (BotFather bot-to-bot, `make up`).
+dirs + live `.env` files (including `DEEPSEEK_API_KEY` when chosen), set
+`agents.defaults.model.primary` + `contextTokens`, and print next steps
+(BotFather bot-to-bot, `make up`, `make enable-deepseek`).
 
 ## Runtime shape (verified on OpenClaw 2026.6.34)
 
@@ -73,7 +80,7 @@ Optional audit group key may remain placeholder until operator replaces it.
 
 - [x] MIT LICENSE, README, AGENTS.md, .gitignore, .env.example
 - [x] Makefile: up down setup generate test lint health logs config doctor
-- [x] Interactive setup for N>=2 with tokens + owner id
+- [x] Interactive setup for N>=2 with tokens + owner id + optional DeepSeek/model/context
 - [x] Generated isolated compose (one network per agent)
 - [x] Unit tests + ruff via Docker
 - [x] Default 2-agent placeholder layout
