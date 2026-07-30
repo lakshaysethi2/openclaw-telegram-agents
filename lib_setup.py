@@ -56,8 +56,7 @@ def prompt_model_choice(
         print(f"    {idx}) {ref}  - {desc}")
     print(f"    {len(DEEPSEEK_MODEL_CHOICES) + 1}) custom provider/model ref")
     raw = input_fn(
-        f"  Choose 1-{len(DEEPSEEK_MODEL_CHOICES) + 1} "
-        f"[default 1 = {DEEPSEEK_DEFAULT_MODEL}]: "
+        f"  Choose 1-{len(DEEPSEEK_MODEL_CHOICES) + 1} [default 1 = {DEEPSEEK_DEFAULT_MODEL}]: "
     ).strip()
     if not raw:
         return DEEPSEEK_DEFAULT_MODEL
@@ -94,9 +93,7 @@ def prompt_context_tokens(*, input_fn: PromptFn, label: str) -> int:
         f"DeepSeek V4 native max is {DEEPSEEK_MAX_CONTEXT_TOKENS}; "
         f"runtime caps may be lower."
     )
-    raw = input_fn(
-        f"  Context tokens [{DEEPSEEK_DEFAULT_CONTEXT_TOKENS}]: "
-    ).strip()
+    raw = input_fn(f"  Context tokens [{DEEPSEEK_DEFAULT_CONTEXT_TOKENS}]: ").strip()
     if not raw:
         return DEEPSEEK_DEFAULT_CONTEXT_TOKENS
     return parse_context_tokens(raw, field_name="context_tokens")
@@ -144,12 +141,8 @@ def prompt_llm_settings(
     else:
         for i in range(1, agent_count + 1):
             print(f"\n  LLM settings for agent-{i}:")
-            models.append(
-                prompt_model_choice(input_fn=input_fn, label=f"agent-{i} default model")
-            )
-            contexts.append(
-                prompt_context_tokens(input_fn=input_fn, label=f"agent-{i}")
-            )
+            models.append(prompt_model_choice(input_fn=input_fn, label=f"agent-{i} default model"))
+            contexts.append(prompt_context_tokens(input_fn=input_fn, label=f"agent-{i}"))
 
     return "deepseek", api_key, models, contexts
 

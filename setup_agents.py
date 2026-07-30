@@ -100,9 +100,7 @@ def prompt_stack(
     count_raw = input_fn("How many agents do you want to set up? [min 2]: ").strip()
     count = parse_positive_int(count_raw or "2", field_name="agent_count", minimum=2)
 
-    print(
-        "Authorized human Telegram numeric user id is required for DM allowlists."
-    )
+    print("Authorized human Telegram numeric user id is required for DM allowlists.")
     print("  Tip: message @userinfobot or @getidsbot on Telegram to see your id.")
     owner_raw = input_fn("Your Telegram numeric user id (not @username): ").strip()
     owner_id = require_numeric_id(owner_raw, field_name="owner_telegram_id")
