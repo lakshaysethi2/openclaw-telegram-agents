@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """Friend Bot docdocgo tool — GET /api/search ONLY.
 
-Each result is emitted as a single-source QUOTE UNIT.
-Never merge units. Always show SOURCE_PATH with any quote.
+Plain-text quote units. One SOURCE_PATH per unit. Never merge units.
 """
 from __future__ import annotations
 
@@ -15,7 +14,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://docdocgo.lak.nz/api/search"
-UA = "FriendBot-docdocgo/2.2 (+search-only; single-source-quotes)"
+UA = "FriendBot-docdocgo/2.3 (+search-only; plain-text-quotes)"
 VALID_FILTERS = {"all", "books", "all-hawkins-books", "lectures"}
 FILTER_HINTS = {
     "hawkins": "all-hawkins-books",
@@ -25,41 +24,42 @@ FILTER_HINTS = {
     "all_hawkins_books": "all-hawkins-books",
 }
 
-QUOTE_RULES = """\
-╔══════════════════════════════════════════════════════════════════╗
-║  HARD QUOTE RULES (enforce every reply — not optional)           ║
-║  1. ONE SOURCE_PATH per blockquote. Never stitch two paths.      ║
-║  2. Quotes must be VERBATIM from ONE unit's VERBATIM block.      ║
-║  3. Always print SOURCE_PATH next to each quote.                 ║
-║  4. Paraphrase only if labeled "paraphrase:" — never as a quote. ║
-║  5. Prefer the shortest verbatim window that holds the teaching. ║
-║  6. Do not invent, reorder, or merge sentences across units.     ║
-╚══════════════════════════════════════════════════════════════════╝"""
+# Keep banner tiny — full rules live in DOCDOCGO.md (always in context).
+HEADER = (
+    "PLAIN TEXT search results (not images). "
+    "Each UNIT = one SOURCE_PATH. Quote VERBATIM only; label paraphrase."
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Search docdocgo (GET /api/search only) — single-source quote units",
+        description="Search docdocgo (GET /api/search only) — plain-text quote units",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./search.py "nothing is causing anything" 5
-  ./search.py "surrender" 5 all-hawkins-books
+  ./search.py "nothing is causing anything" 3
+  ./search.py "surrender" 3 all-hawkins-books
   ./search.py "forgiveness" 3 lectures -c 500
-  ./search.py "ego" 5 --partial
-  ./search.py "love" 5 --window 220
+  ./search.py "ego" 3 --partial
+  ./search.py "love" 3 -w 220
 """,
     )
     p.add_argument("query")
-    p.add_argument("limit", nargs="?", type=int, default=10)
+    p.add_argument(
+        "limit",
+        nargs="?",
+        type=int,
+        default=3,
+        help="Results to show (default 3, max 15). Honored exactly.",
+    )
     p.add_argument("filter", nargs="?", default="all")
     p.add_argument("-p", "--page", type=int, default=1)
     p.add_argument(
         "-c",
         "--context",
         type=int,
-        default=400,
-        help="API snippet padding around match (default 400).",
+        default=350,
+        help="API snippet padding around match (default 350).",
     )
     p.add_argument(
         "-g",
@@ -72,8 +72,8 @@ Examples:
         "-w",
         "--window",
         type=int,
-        default=280,
-        help="Max display chars around match for VERBATIM (default 280). Use --full for full snippet.",
+        default=260,
+        help="Max display chars around match for VERBATIM (default 260).",
     )
     p.add_argument("--full", action="store_true", help="Show full API snippet (still one unit/path)")
     p.add_argument("--partial", action="store_true", help="wholeWords=false")
@@ -96,7 +96,6 @@ def find_match_span(snippet: str, query: str) -> tuple[int, int] | None:
         m = re.search(pat, snippet, flags=re.IGNORECASE)
         if m:
             return m.span()
-    # densest-ish: first keyword
     for w in words:
         m = re.search(rf"\b{re.escape(w)}\b", snippet, flags=re.IGNORECASE)
         if m:
@@ -105,10 +104,16 @@ def find_match_span(snippet: str, query: str) -> tuple[int, int] | None:
 
 
 def highlight(snippet: str, span: tuple[int, int] | None) -> str:
+    """Mark match with [[...]] — never >>>/<<< (models misread those as media)."""
     if not span:
         return snippet
     a, b = span
-    return f"{snippet[:a]}>>>{snippet[a:b]}<<<{snippet[b:]}"
+    return f"{snippet[:a]}[[{snippet[a:b]}]]{snippet[b:]}"
+
+
+def strip_api_markers(text: str) -> str:
+    # API sometimes embeds >>>match<<<; normalize to [[match]].
+    return re.sub(r">>>(.*?)<<<", r"[[\1]]", text, flags=re.DOTALL)
 
 
 def trim_window(snippet: str, span: tuple[int, int] | None, window: int, full: bool) -> str:
@@ -116,7 +121,7 @@ def trim_window(snippet: str, span: tuple[int, int] | None, window: int, full: b
     if full or not s:
         return s
     if window <= 0:
-        window = 280
+        window = 260
     if not span:
         return (s[:window] + ("…" if len(s) > window else "")).strip()
     a, b = span
@@ -124,7 +129,6 @@ def trim_window(snippet: str, span: tuple[int, int] | None, window: int, full: b
     half = max(window // 2, (b - a) + 40)
     left = max(0, mid - half)
     right = min(len(s), mid + half)
-    # snap to word-ish boundaries
     if left > 0:
         sp = s.find(" ", left)
         if 0 < sp < left + 40:
@@ -159,23 +163,30 @@ def main(argv: list[str] | None = None) -> int:
         print('Usage: ./search.py "query" [limit] [filter]', file=sys.stderr)
         return 2
     if len(query) < 4 and not args.regex:
-        print("⚠️  Query under 4 chars — API may return nothing.", file=sys.stderr)
+        print(
+            "NOTE: query under 4 chars — enabling --partial (API min length).",
+            file=sys.stderr,
+        )
+        args.partial = True
 
     filt = (args.filter or "all").strip()
     if filt in FILTER_HINTS:
         hint = FILTER_HINTS[filt]
-        print(f"⚠️  Filter '{filt}' → '{hint}'")
+        print(f"NOTE: filter '{filt}' → '{hint}'")
         filt = hint
     elif filt not in VALID_FILTERS:
         print(
-            f"ℹ️  Filter '{filt}' not a preset ({', '.join(sorted(VALID_FILTERS))}). "
-            "Typos may empty-result (API may include warning)."
+            f"NOTE: filter '{filt}' not a preset "
+            f"({', '.join(sorted(VALID_FILTERS))}). "
+            "Typos may empty-result."
         )
 
-    limit = max(10, min(int(args.limit or 10), 25))
+    # Honor the requested limit exactly (clamp only for safety).
+    requested = int(args.limit if args.limit is not None else 3)
+    limit = max(1, min(requested, 15))
     page = max(1, int(args.page or 1))
-    context = int(args.context if args.context and args.context > 0 else 400)
-    window = int(args.window if args.window and args.window > 0 else 280)
+    context = int(args.context if args.context and args.context > 0 else 350)
+    window = int(args.window if args.window and args.window > 0 else 260)
 
     params: dict = {
         "q": query,
@@ -193,10 +204,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.regex:
         params["useRegex"] = "true"
 
-    print()
-    print(QUOTE_RULES)
-    print()
-    print(f'🔍  docdocgo search › "{query}"')
+    print(HEADER)
+    print(f'SEARCH: "{query}"')
     extras = []
     if args.partial:
         extras.append("partial")
@@ -206,12 +215,11 @@ def main(argv: list[str] | None = None) -> int:
         extras.append("regex")
     if args.full:
         extras.append("full-snippet")
-    extra_s = f" | {', '.join(extras)}" if extras else ""
+    extra_s = f" extras={','.join(extras)}" if extras else ""
     print(
-        f"    Limit: {limit} | Filter: {filt} | Page: {page} | "
-        f"API context: {context} | Display window: {window}{extra_s}"
+        f"opts: limit={limit} filter={filt} page={page} "
+        f"context={context} window={window}{extra_s}"
     )
-    print("    Endpoint: GET /api/search only · each unit = one SOURCE_PATH")
     print()
 
     url = f"{API}?{urllib.parse.urlencode(params)}"
@@ -220,10 +228,10 @@ def main(argv: list[str] | None = None) -> int:
         with urllib.request.urlopen(req, timeout=45) as r:
             data = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        print(f"❌  HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr)
+        print(f"ERROR HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr)
         return 1
     except Exception as e:  # noqa: BLE001
-        print(f"❌  {e}", file=sys.stderr)
+        print(f"ERROR {e}", file=sys.stderr)
         return 1
 
     if args.json:
@@ -232,9 +240,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if data.get("warning"):
         w = data["warning"]
-        print(f"⚠️  API warning: {w.get('message')}")
+        print(f"API warning: {w.get('message')}")
         if w.get("hint"):
-            print(f"    {w['hint']}")
+            print(f"  {w['hint']}")
         print()
 
     results = data.get("results") or []
@@ -242,26 +250,19 @@ def main(argv: list[str] | None = None) -> int:
     total_files = int(data.get("files_count") or 0)
     total_pages = int(data.get("total_pages") or 0)
     page_n = int(data.get("page") or page)
-    opts = data.get("options") or {}
 
-    print(f"📚  {total_matches:,} matches across {total_files} files")
-    if total_matches:
-        print(
-            f"📄  Page {page_n}/{max(total_pages, 1)} · limit {limit} · "
-            f"contextChars={opts.get('contextChars')} · groupDistance={opts.get('groupDistance')}"
-        )
+    print(f"hits: {total_matches:,} matches in {total_files} files | page {page_n}/{max(total_pages, 1)}")
     print()
 
     if not results:
-        print("   No results.")
-        print("   Try: simpler phrase · --partial · filter all · different synonym")
+        print("No results. Try: simpler phrase | --partial | filter all | synonym")
         print()
         return 0
 
     for i, row in enumerate(results[:limit], 1):
         path = str(row.get("path") or "unknown")
         title = display_title(path)
-        snippet = (row.get("snippet") or "").strip()
+        snippet = strip_api_markers((row.get("snippet") or "").strip())
         if snippet.startswith("..."):
             snippet = snippet[3:]
         if snippet.endswith("..."):
@@ -270,46 +271,32 @@ def main(argv: list[str] | None = None) -> int:
 
         span = find_match_span(snippet, query)
         trimmed = trim_window(snippet, span, window, args.full)
-        # re-find span on trimmed for highlight
         span2 = find_match_span(trimmed, query) if span else None
-        if span and not span2 and ">>>" not in trimmed:
-            # highlight may fail after trim edge; keep trimmed plain
-            shown = trimmed
-        else:
-            shown = highlight(trimmed, span2)
+        shown = highlight(trimmed, span2) if span2 else trimmed
+        shown = strip_api_markers(shown)
 
         mtext = ", ".join(f'"{w}"' for w in (row.get("match_text") or []))
+        score = row.get("score")
+        prox = row.get("proximity")
+        chapter = row.get("chapter") or ""
 
-        print(f"════ QUOTE UNIT #{i}  (single source — do not merge with other units) ════")
+        print(f"--- UNIT {i} ---")
         print(f"SOURCE_PATH: {path}")
         print(f"DISPLAY: {title}")
-        if row.get("chapter"):
-            print(f"CHAPTER: {row['chapter']}")
-        print(
-            f"META: score={row.get('score')} matches={row.get('match_count')} "
-            f"proximity={row.get('proximity')} offset={row.get('offset')}"
-        )
-        print(f"KEYWORDS: {mtext}")
-        print("VERBATIM (copy only from this block into ONE Discord blockquote):")
-        print("<<<")
+        if chapter:
+            print(f"CHAPTER: {chapter}")
+        print(f"META: score={score} proximity={prox} keywords={mtext}")
+        print("VERBATIM:")
         print(shown if shown else "(empty snippet)")
-        print(">>>")
-        print(f"ATTRIBUTION LINE (required under the quote):")
-        print(f"  — {title}")
-        print(f"  path: `{path}`")
-        print(f"════ END QUOTE UNIT #{i} ══════════════════════════════════════════")
+        print(f"CITE: — {title}")
+        print(f"path: `{path}`")
+        print(f"--- END UNIT {i} ---")
         print()
 
-    print("REPLY CHECKLIST")
-    print("  □ Each Discord blockquote body came from exactly one VERBATIM block")
-    print("  □ Each quote followed by its SOURCE_PATH (and display title)")
-    print("  □ No stitching Unit A sentence + Unit B sentence into one quote")
-    print("  □ Any summary labeled paraphrase: (not as a quote)")
-    print()
-
+    print("RULES: one blockquote per unit; cite path; no stitch; paraphrase: if restating")
     if total_pages > page_n:
-        print(f"➡️  Next page: ./search.py {query!r} {limit} {filt} -p {page_n + 1}")
-        print()
+        print(f"NEXT: ./search.py {query!r} {limit} {filt} -p {page_n + 1}")
+    print()
     return 0
 
 

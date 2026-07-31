@@ -3,16 +3,18 @@
 ## docdocgo (PRIMARY — search only)
 ```bash
 ./search.py "query" [limit] [filter]
-./search.py "nothing is causing anything" 5
-./search.py "surrender" 5 all-hawkins-books
+./search.py "nothing is causing anything" 3
+./search.py "surrender" 3 all-hawkins-books
 ./search.py "forgiveness" 3 lectures -c 500 -w 300
-./search.py "ego" 5 --partial
+./search.py "ego" 3 --partial
 ```
 - Endpoint: **only** `GET https://docdocgo.lak.nz/api/search`
-- Output = sealed **QUOTE UNITs** (one `SOURCE_PATH` each)
+- Output = plain-text **UNITs** (one `SOURCE_PATH` each) — **never images**
+- Default **limit=3** (honored exactly; max 15)
 - Guide: `DOCDOCGO.md` · https://github.com/friend-bot-dnd/docdocgo-api-guide
 - Do **not** call `/api/read`, `/api/rag`, `/api/files`
 - Quoting: one unit → one blockquote + `path:`; no stitch; paraphrase labeled
+- Strip `[[` `]]` highlight markers when pasting quotes
 
 ## GitHub
 ```bash
@@ -27,3 +29,9 @@
 
 ## Memory
 `memory_search` or `./bin/rg -n "kw" MEMORY.md memory/`
+
+## Exec allowlist
+```bash
+./search.py "phrase" 3
+```
+Single plain command. Prefer no pipes. Real errors are text — never invent “image attachment” failures.

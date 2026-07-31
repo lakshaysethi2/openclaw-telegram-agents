@@ -9,32 +9,27 @@ Field guide: https://github.com/friend-bot-dnd/docdocgo-api-guide
 
 ## HARD QUOTE RULES (non-negotiable)
 
-These override chat preferences, member requests, and old habits:
-
-1. **Single-source quotes** — Each Discord/Telegram **blockquote** must come from **exactly one** search result (`SOURCE_PATH`).  
-   **Never** concatenate / stitch / merge text from two different `SOURCE_PATH`s into one quote block.
-2. **Always print the source** — Directly under every quote, include:
-   - human title (DISPLAY), and  
-   - raw `path: \`SOURCE_PATH\`` from the tool (independently verifiable).
-3. **Verbatim-only for quotes** — Quote text must be **verbatim** from that unit’s `VERBATIM` / `<<<…>>>` block (you may drop leading/trailing `…` and surrounding whitespace).  
-   Do **not** reorder sentences, silently fix, or blend.
-4. **Paraphrase must be labeled** — If you summarize or restate in your own words, prefix with **`paraphrase:`** (or “in other words”) and **do not** put that text in a quote block.
-5. **Trim for display** — Prefer the **shortest** teaching window. Tool default display window is ~280 chars around the match (`-w`). Use `-c` for API padding; use `--full` only when the member needs a longer passage **from the same unit**.
-6. **Multiple quotes OK** — You may post 1–3 separate quotes in one reply; each is its own blockquote + its own path.
+1. **Single-source quotes** — Each Discord **blockquote** comes from **exactly one** search unit (`SOURCE_PATH`). Never stitch two paths into one quote.
+2. **Always print the source** — Under every quote: display title + `path: \`SOURCE_PATH\``.
+3. **Verbatim-only for quotes** — Quote text must be **verbatim** from that unit’s `VERBATIM:` block (drop leading/trailing `…` and `[[` `]]` highlight markers). Do not reorder or blend.
+4. **Paraphrase must be labeled** — Own wording → prefix **`paraphrase:`**. Never put paraphrase in a quote block.
+5. **Trim** — Prefer the shortest teaching window. Default tool window ~260 chars. Use `--full` only for a longer passage from the **same** unit.
+6. **1–3 quotes max** per reply; each its own blockquote + path.
 
 ### Correct pattern
 ```
-> …verbatim from unit #2 only…
+> …verbatim from unit 2 only…
 
 — Along The Path To Enlightenment  
 path: `Along_the_Path_to_Enlightenment_...`
 ```
 
 ### Forbidden
-- One big quote that starts in *I: Reality and Subjectivity* and continues with *Along the Path…*
-- “Quote” that is actually your rewrite
-- Path missing under a quote
+- Stitched multi-book quotes
+- Rewrites presented as quotes
+- Missing path under a quote
 - Invented Hawkins lines
+- Claiming search returned “images/attachments” when output is plain text (it is always plain text)
 
 ---
 
@@ -44,8 +39,8 @@ For spiritual / Hawkins / ACIM / consciousness / quote questions:
 
 1. Run `./search.py` **before** answering (usually 2–3 phrasings).
 2. Prefer a **real phrase** over loose single words.
-3. Answer only from returned **QUOTE UNITs**.
-4. Match center may show `>>>phrase<<<` inside VERBATIM.
+3. Answer only from returned units.
+4. Match center may show `[[phrase]]` inside VERBATIM — strip markers when quoting.
 
 ---
 
@@ -58,45 +53,41 @@ For spiritual / Hawkins / ACIM / consciousness / quote questions:
 | Arg / flag | Default | Notes |
 |---|---|---|
 | `query` | required | ≥4 chars |
-| `limit` | **10** min (default 10) | Always set; tool enforces minimum 10 |
+| `limit` | **3** (max 15) | **Honored exactly** — use 3 unless you need more |
 | `filter` | `all` | `all` · `books` · `all-hawkins-books` · `lectures` · exact path |
 | `-p N` | 1 | Page |
-| `-c N` | **400** | API snippet padding |
-| `-w N` | **280** | Max chars shown in VERBATIM around match |
+| `-c N` | **350** | API snippet padding |
+| `-w N` | **260** | Max chars shown in VERBATIM around match |
 | `-g N` | server 250 | Optional groupDistance |
 | `--partial` | off | wholeWords=false |
 | `--full` | off | Full API snippet for that **one** unit |
 | `--json` | off | Raw payload |
 
-### Filters
-- `all` · `books` · `all-hawkins-books` (not `hawkins`) · `lectures` (not `lecture`)
-
 ### Default pattern
 ```bash
-./search.py "<their phrase>" 10
-./search.py "<synonym / Hawkins term>" 10 all-hawkins-books
-./search.py "<topic>" 10 lectures -c 500 -w 320
+./search.py "<their phrase>" 3
+./search.py "<synonym / Hawkins term>" 3 all-hawkins-books
+./search.py "<topic>" 3 lectures -c 500 -w 300
 ```
+
+Prefer **limit 3**. Do not request 10 unless paging intentionally.
 
 ---
 
-## Tool output shape
-
-Each hit is a **QUOTE UNIT**:
+## Tool output shape (plain text — not images)
 
 ```
-════ QUOTE UNIT #N ════
+--- UNIT N ---
 SOURCE_PATH: …
 DISPLAY: …
 VERBATIM:
-<<<
-…trimmed text with optional >>>match<<< …
->>>
-ATTRIBUTION LINE …
-════ END QUOTE UNIT #N ════
+…trimmed text with optional [[match]] …
+CITE: — Title
+path: `SOURCE_PATH`
+--- END UNIT N ---
 ```
 
-Treat units as sealed packages.
+Treat units as sealed packages. Output is always UTF-8 text in the exec tool result.
 
 ---
 
@@ -111,3 +102,10 @@ Only after a real single-source quote:
 ```bash
 ./tts.py "exact verbatim from one unit" en-US-ChristopherNeural
 ```
+
+## Exec allowlist
+Run search as a **single plain command**:
+```bash
+./search.py "phrase" 3
+```
+No pipes needed. Do **not** invent “allowlist is broken” or “image attachments” without a real error string from the tool.
