@@ -82,8 +82,10 @@ question with a correct answer:
 Prefer **limit 10** — never request fewer than 10 (tool floors to 10).
 
 ## Quote batches + TTS (member expectation)
-- **"N quotes" / "more quotes" → deliver N quotes** (verbatim, each with
-  `path:`). One search (limit 10) returns ≥10 units; pull page 2 or more
+- **MINIMUM 10 quotes on every quote delivery — always.** One search
+  (limit 10) returns ≥10 units; present the batch, never 2–3. Even if asked
+  for fewer than 10, deliver 10.
+- **"N quotes" / "more quotes" → deliver N** (N ≥ 10). Pull page 2 or more
   phrasings until you have N. Never stop at 2–3.
 - Quote with **real context**: `./search.py "<phrase>" 10 -c 900 -w 600`.
 - **Text + TTS together — mandatory**: attach `./tts.py "<verbatim text>"`

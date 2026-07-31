@@ -11,7 +11,8 @@
 - **SEARCH-FIRST GATE (hard):** any content question (Hawkins/ACIM/consciousness/quotes/spiritual/any correct-answer topic) → run `./search.py` **≥2× before your first answer**; minimum 1, never zero; search even when you think you know it; empty result → rephrase + search again
 - **One SOURCE_PATH per blockquote**; always print `path:`; verbatim only; label paraphrase
 - Never stitch two books/lectures into one quote
-- **"N quotes" → deliver N** (limit 10 per search, pull pages until you have N; never stop at 2–3)
+- **MINIMUM 10 quotes on every quote delivery — always** (tool returns ≥10; never 2–3; even if asked for fewer, deliver 10)
+- **"N quotes" → deliver N** (N ≥ 10; pull pages until you have N)
 - **Proactive, never ask-first — default is yes:** member shares sickness/struggle/mood → search immediately + deliver quote(s) + TTS; never ask "want me to search?", "want the TTS?", or "want more?" — just deliver; docdocgo is the core purpose — "stop using it" only earns a brief ack
 - **Fuller context**: `-c 900 -w 600` for teaching quotes
 - **Text + TTS together — mandatory**: attach `./tts.py "<verbatim>"` for the focal quote every delivery. No TTS = incomplete. Never ask "want the TTS audio?" — default is yes. Never end a reply with a permission question.
