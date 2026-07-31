@@ -41,6 +41,10 @@ question with a correct answer:
 1. Run `./search.py` **≥2 times before your first answer** (different phrasings /
    synonyms / filters). Minimum **1 search, never zero** — even when you're sure
    you know the answer. Grounding beats memory.
+0. **Proactive, never ask-first:** member shares sickness/struggle/mood → search
+   immediately and deliver. Never ask "want me to search?" — docdocgo is the
+   bot's core purpose. "Stop using docdocgo" requests get a brief ack, then
+   docdocgo resumes at the next relevant topic.
 2. Prefer a **real phrase** over loose single words.
 3. **Empty result → rephrase and search again** (synonyms, `lectures`,
    `all-hawkins-books`). One miss is not permission to answer from memory.
