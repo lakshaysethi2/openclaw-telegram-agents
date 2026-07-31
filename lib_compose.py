@@ -20,8 +20,7 @@ def _service_block(agent: AgentSpec) -> str:
           image: ${{OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}}
           container_name: openclaw-{agent.name}
           env_file:
-            - path: agents/{agent.name}/.env
-              required: false
+            - agents/{agent.name}/.env
           environment:
             HOME: /home/node
             OPENCLAW_HOME: /home/node

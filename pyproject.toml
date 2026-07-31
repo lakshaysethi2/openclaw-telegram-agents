@@ -15,6 +15,7 @@ addopts = "-q"
 target-version = "py311"
 line-length = 100
 src = [".", "tests"]
+exclude = ["agents"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

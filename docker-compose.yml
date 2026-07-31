@@ -8,8 +8,7 @@ services:
     image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
     container_name: openclaw-agent-1
     env_file:
-      - path: agents/agent-1/.env
-        required: false
+      - agents/agent-1/.env
     environment:
       HOME: /home/node
       OPENCLAW_HOME: /home/node
@@ -24,7 +23,7 @@ services:
       - ./agents/agent-1/workspace:/home/node/.openclaw/workspace
       - ./agents/agent-1/auth:/home/node/.config/openclaw
     ports:
-      - "18789:18789"
+      - "18791:18789"
     networks:
       - agent_1_net
     init: true
@@ -59,8 +58,7 @@ services:
     image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
     container_name: openclaw-agent-2
     env_file:
-      - path: agents/agent-2/.env
-        required: false
+      - agents/agent-2/.env
     environment:
       HOME: /home/node
       OPENCLAW_HOME: /home/node
@@ -75,7 +73,7 @@ services:
       - ./agents/agent-2/workspace:/home/node/.openclaw/workspace
       - ./agents/agent-2/auth:/home/node/.config/openclaw
     ports:
-      - "18790:18789"
+      - "18792:18789"
     networks:
       - agent_2_net
     init: true
