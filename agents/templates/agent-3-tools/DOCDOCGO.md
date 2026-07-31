@@ -33,14 +33,19 @@ path: `Along_the_Path_to_Enlightenment_...`
 
 ---
 
-## Always search first
+## Always search first (HARD GATE)
 
-For spiritual / Hawkins / ACIM / consciousness / quote questions:
+For spiritual / Hawkins / ACIM / consciousness / quote questions — and ANY content
+question with a correct answer:
 
-1. Run `./search.py` **before** answering (usually 2–3 phrasings).
+1. Run `./search.py` **≥2 times before your first answer** (different phrasings /
+   synonyms / filters). Minimum **1 search, never zero** — even when you're sure
+   you know the answer. Grounding beats memory.
 2. Prefer a **real phrase** over loose single words.
-3. Answer only from returned units.
-4. Match center may show `[[phrase]]` inside VERBATIM — strip markers when quoting.
+3. **Empty result → rephrase and search again** (synonyms, `lectures`,
+   `all-hawkins-books`). One miss is not permission to answer from memory.
+4. Answer only from returned units.
+5. Match center may show `[[phrase]]` inside VERBATIM — strip markers when quoting.
 
 ---
 
