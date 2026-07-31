@@ -63,6 +63,7 @@ def test_openclaw_json_quiet_chat_and_heartbeat_off() -> None:
     assert 'thinkingDefault: "off"' in text
     assert 'blockStreamingDefault: "off"' in text
     assert 'mode: "off"' in text  # channels.telegram.streaming.mode
+    assert 'replyToMode: "first"' in text
     assert "showOk: false" in text
 
 

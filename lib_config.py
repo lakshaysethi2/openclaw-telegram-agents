@@ -136,6 +136,9 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
               streaming: {{
                 mode: "off",
               }},
+              // Native Telegram reply_to on the user message (groups + DMs).
+              // first = first chunk only; all = every chunk; off = plain chat messages.
+              replyToMode: "first",
               heartbeat: {{
                 showOk: false,
                 showAlerts: false,
