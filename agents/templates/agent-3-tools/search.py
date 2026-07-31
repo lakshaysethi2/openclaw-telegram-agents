@@ -37,11 +37,11 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./search.py "nothing is causing anything" 3
-  ./search.py "surrender" 3 all-hawkins-books
-  ./search.py "forgiveness" 3 lectures -c 500
-  ./search.py "ego" 3 --partial
-  ./search.py "love" 3 -w 220
+  ./search.py "nothing is causing anything" 10
+  ./search.py "surrender" 10 all-hawkins-books
+  ./search.py "forgiveness" 10 lectures -c 500
+  ./search.py "ego" 10 --partial
+  ./search.py "love" 10 -w 260
 """,
     )
     p.add_argument("query")
@@ -49,8 +49,8 @@ Examples:
         "limit",
         nargs="?",
         type=int,
-        default=3,
-        help="Results to show (default 3, max 15). Honored exactly.",
+        default=10,
+        help="Results to show (min 10, default 10, max 25). Tool floors to 10.",
     )
     p.add_argument("filter", nargs="?", default="all")
     p.add_argument("-p", "--page", type=int, default=1)
@@ -59,7 +59,7 @@ Examples:
         "--context",
         type=int,
         default=350,
-        help="API snippet padding around match (default 350).",
+        help="API snippet padding around match (default 350, min 250).",
     )
     p.add_argument(
         "-g",
@@ -182,10 +182,10 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     # Honor the requested limit exactly (clamp only for safety).
-    requested = int(args.limit if args.limit is not None else 3)
-    limit = max(1, min(requested, 15))
+    requested = int(args.limit if args.limit is not None else 10)
+    limit = max(10, min(requested, 25))
     page = max(1, int(args.page or 1))
-    context = int(args.context if args.context and args.context > 0 else 350)
+    context = max(250, int(args.context if args.context and args.context > 0 else 350))
     window = int(args.window if args.window and args.window > 0 else 260)
 
     params: dict = {

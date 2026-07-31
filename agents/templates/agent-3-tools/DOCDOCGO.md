@@ -58,10 +58,10 @@ question with a correct answer:
 | Arg / flag | Default | Notes |
 |---|---|---|
 | `query` | required | ≥4 chars |
-| `limit` | **3** (max 15) | **Honored exactly** — use 3 unless you need more |
+| `limit` | **10** (min, default; max 25) | **Never request fewer than 10** — tool floors to 10 |
 | `filter` | `all` | `all` · `books` · `all-hawkins-books` · `lectures` · exact path |
 | `-p N` | 1 | Page |
-| `-c N` | **350** | API snippet padding |
+| `-c N` | **350** | API snippet padding (**min 250**) |
 | `-w N` | **260** | Max chars shown in VERBATIM around match |
 | `-g N` | server 250 | Optional groupDistance |
 | `--partial` | off | wholeWords=false |
@@ -70,12 +70,12 @@ question with a correct answer:
 
 ### Default pattern
 ```bash
-./search.py "<their phrase>" 3
-./search.py "<synonym / Hawkins term>" 3 all-hawkins-books
-./search.py "<topic>" 3 lectures -c 500 -w 300
+./search.py "<their phrase>" 10
+./search.py "<synonym / Hawkins term>" 10 all-hawkins-books
+./search.py "<topic>" 10 lectures -c 500 -w 300
 ```
 
-Prefer **limit 3**. Do not request 10 unless paging intentionally.
+Prefer **limit 10** — never request fewer than 10 (tool floors to 10).
 
 ---
 
@@ -111,6 +111,6 @@ Only after a real single-source quote:
 ## Exec allowlist
 Run search as a **single plain command**:
 ```bash
-./search.py "phrase" 3
+./search.py "phrase" 10
 ```
 No pipes needed. Do **not** invent “allowlist is broken” or “image attachments” without a real error string from the tool.
