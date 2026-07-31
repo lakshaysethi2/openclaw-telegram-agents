@@ -1,17 +1,9 @@
-# DOCDOCGO.md — Primary knowledge tools
+# DOCDOCGO.md — Search only
 
-Source field guide: https://github.com/friend-bot-dnd/docdocgo-api-guide  
-Base: `https://docdocgo.lak.nz`
+**You may only use** `GET https://docdocgo.lak.nz/api/search` via `./search.py`.  
+Do **not** call `/api/read`, `/api/rag`, or `/api/files`.
 
-You have **three** tools. Prefer them in this order for teaching questions.
-
-| Tool | Endpoint | Use for |
-|---|---|---|
-| `./search.py` | `GET /api/search` | Find sources + short quotes |
-| `./search.py ... --expand` or `./read.py` | `GET /api/read/:path` (windowed only) | Full paragraph around the real match |
-| `./rag.py` | `POST /api/rag` | Semantic ~500-token chunks when keyword search is thin |
-
-**Never** dump whole files into Discord. `read.py` always windows. Do not call `/api/files` browsing dumps.
+Field guide: https://github.com/friend-bot-dnd/docdocgo-api-guide
 
 ---
 
@@ -19,104 +11,72 @@ You have **three** tools. Prefer them in this order for teaching questions.
 
 For spiritual / Hawkins / ACIM / consciousness / quote questions:
 
-1. Run tools **before** answering (usually 2–3 queries).
-2. Prefer a **real phrase** (`"nothing is causing anything"`) over loose words.
-3. If snippets look like lecture intros / WEBVTT banter → **`--expand`** (or `./read.py PATH -q "..."`).
-4. Quote only tool text. Attribute with `path` (+ chapter when shown).
-5. Optional TTS after a short exact quote.
+1. Run `./search.py` **before** answering (usually 2–3 different phrasings).
+2. Prefer a **real phrase** (`"nothing is causing anything"`) over loose single words.
+3. Quote only returned snippets. Attribute with `path` (+ chapter when shown).
+4. Match center is marked `>>>phrase<<<` when the API snippet contains the query.
 
 ---
 
-## Commands
+## Command
 
-### Keyword search
 ```bash
 ./search.py "query" [limit] [filter] [options]
 ```
 
 | Arg / flag | Default | Notes |
 |---|---|---|
-| `query` | required | Prefer ≥4 chars and a real phrase |
-| `limit` | 5 | Set explicitly |
+| `query` | required | ≥4 chars. Multi-word ranked search |
+| `limit` | 5 | Always set (API bare default is 100) |
 | `filter` | `all` | `all` · `books` · `all-hawkins-books` · `lectures` · exact path |
-| `-p N` | 1 | Pagination |
-| `-c N` | **300** | API context. **Do not use 1200+** for multi-word search — it groups distant hits and looks like file-start junk |
-| `--expand` | off | Re-center each hit via `/api/read` on exact phrase / densest terms |
-| `--before` / `--after` | 500 / 1000 | Expand window |
-| `--max-chars` | 3500 | Cap expanded passage |
-| `--full` | off | Don’t locally truncate API snippets |
+| `-p N` | 1 | Page (deterministic) |
+| `-c N` | **400** | Snippet padding around the match anchor |
+| `-g N` | server 250 | Optional `groupDistance` (how close words must be to group) |
 | `--partial` | off | `wholeWords=false` |
-| `--json` | off | Debug |
+| `--full` | off | Don’t locally truncate display |
+| `--json` | off | Raw payload |
 
-### Windowed read (when you already have a path)
-```bash
-./read.py PATH -q "exact phrase"
-./read.py PATH -o OFFSET -q "phrase"
-./read.py PATH -o OFFSET          # offset window only
-```
-
-### Semantic RAG
-```bash
-./rag.py "natural language question" 3
-```
+### Filters (case-sensitive; bad values empty or warn)
+- `all` · `books` · `all-hawkins-books` (not `hawkins`) · `lectures` (not `lecture`)
 
 ---
 
-## Critical: sparse snippets
+## How search works (so you use it well)
 
-The search API uses `context` both for padding **and** for grouping multi-word hits.  
-Large `-c` (e.g. 1200) can chain `"is"` at file start with `"causing"` thousands of chars later → WEBVTT intro garbage.
+1. Query words (minus light stop-words) are found across the library.
+2. Nearby hits are **grouped** if consecutive hits are within `groupDistance` (default **250** chars). This is **independent** of `-c` context padding.
+3. Each result snippet is **centered on**:
+   - the **exact query phrase** when present near the group, else
+   - the **densest cluster** of query keywords
+4. Then `context` chars of padding are added on each side.
+5. Scoring favors more unique keywords + tight proximity; **exact phrase ×1.5**.
 
-**Fix:**
+### Practical tips
+- Use full teaching phrases when you know them.
+- Raise `-c` for longer quotes (400–800 is fine). Grouping no longer blows up with large context.
+- If empty: synonym, `--partial`, or `filter all`.
+- `total_pages` is real page count (`ceil(matches/limit)`).
+- `match_text` = unique keywords in the group (not every span).
+- Prefer page 1; use `-p 2` only when page 1 is useful.
+
+### Default pattern
 ```bash
-./search.py "nothing is causing anything" 5 --expand
-# or
-./read.py Some_Lecture_Path -q "nothing is causing anything"
-./rag.py "nothing is causing anything" 3
-```
-
-The tool marks `⚠️ SPARSE` and prints the expand command when proximity is huge.
-
-Match center is marked with `>>>phrase<<<`.
-
----
-
-## Default pattern for a member question
-```bash
-./search.py "<their key phrase>" 5 --expand
-./search.py "<synonym>" 5 all-hawkins-books --expand
-# if still thin:
-./rag.py "<question in plain words>" 3
+./search.py "<their phrase>" 5
+./search.py "<synonym / Hawkins term>" 5 all-hawkins-books
+./search.py "<topic>" 5 lectures -c 500
+# thin results:
 ./search.py "<simpler word>" 5 --partial
 ```
 
-### Filters (case-sensitive; typos silent-empty)
-| Value | Use |
-|---|---|
-| `all` | Default |
-| `books` | Books |
-| `all-hawkins-books` | Hawkins books only (NOT `hawkins`) |
-| `lectures` | Lectures (NOT `lecture`) |
-| exact path | From a prior hit |
-
 ---
 
-## Answer style (Discord)
-1. 1–3 sentence plain answer grounded in results.
-2. 1–3 short quotes with attribution (`path` / title).
-3. Prefer expanded / RAG passages over junk intros.
+## Answer style
+1. 1–3 sentences grounded in snippets.
+2. 1–3 short quotes with path attribution.
+3. No invented Hawkins lines.
 4. Crisis → kindness + real-world help.
 
-### Never
-- Invent quotes.
-- Paste whole books.
-- Claim the library is empty after one bad filter.
-- Use giant `-c` instead of `--expand`.
-
----
-
-## TTS companion
+## TTS after a good short quote
 ```bash
-./tts.py "exact quote text" en-US-ChristopherNeural
+./tts.py "exact quote" en-US-ChristopherNeural
 ```
-Media only under `/tmp/openclaw/media/`.

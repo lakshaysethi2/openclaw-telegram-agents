@@ -1,38 +1,27 @@
-# TOOLS.md — Friend Bot local tools
+# TOOLS.md — Friend Bot
 
-## docdocgo (PRIMARY)
+## docdocgo (PRIMARY — search only)
 ```bash
-./search.py "query" 5
-./search.py "exact teaching phrase" 5 --expand
-./read.py PATH -q "phrase"
-./rag.py "natural language question" 3
+./search.py "query" [limit] [filter]
+./search.py "nothing is causing anything" 5
+./search.py "surrender" 5 all-hawkins-books
+./search.py "forgiveness" 3 lectures -c 500
+./search.py "ego" 5 --partial
 ```
-- Craft guide: `DOCDOCGO.md`
-- Upstream: https://github.com/friend-bot-dnd/docdocgo-api-guide
-- `read` is **windowed only** (no full-file dumps)
-- If snippets look like WEBVTT intros → `--expand` or `./read.py`
+- Endpoint: **only** `GET https://docdocgo.lak.nz/api/search`
+- Guide: `DOCDOCGO.md` · https://github.com/friend-bot-dnd/docdocgo-api-guide
+- Do **not** call `/api/read`, `/api/rag`, `/api/files`
 
-## GitHub CLI
+## GitHub
 ```bash
 ./gh.sh project view 1 --owner lakshaysethi2
-./gh.sh project item-list 1 --owner lakshaysethi2 --limit 20
 ```
 
-## TTS
+## TTS / Giphy
 ```bash
-./tts.py "text" [voice]    # → MEDIA:/tmp/openclaw/media/...
-```
-
-## Giphy
-```bash
-./giphy.py "term"          # → MEDIA:/tmp/openclaw/media/...gif
+./tts.py "text" [voice]
+./giphy.py "term"    # MEDIA:/tmp/openclaw/media/...
 ```
 
 ## Memory
-```bash
-# memory_search tool, or:
-./bin/rg -n "kw" MEMORY.md memory/
-```
-
-## Exec policy
-Allowlisted paths only. Prefer `./search.py`, `./read.py`, `./rag.py`, `./tts.py`, `./giphy.py`, `./gh.sh`.
+`memory_search` or `./bin/rg -n "kw" MEMORY.md memory/`

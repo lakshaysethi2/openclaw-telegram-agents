@@ -1,30 +1,21 @@
 #!/usr/bin/env python3
-"""docdocgo search + optional match-centered expand for Friend Bot.
+"""Friend Bot docdocgo tool — GET /api/search ONLY.
 
-Uses GET /api/search. With --expand, also uses GET /api/read/:path ONLY to
-re-window around the true phrase / densest term cluster (fixes bad API
-snippets when -c is large or multi-word proximity is sparse).
+No /api/read, /api/rag, or /api/files.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 
-from docdocgo_lib import (
-    clean_display_path,
-    expand_passage,
-    highlight_match,
-    http_get_json,
-    query_terms,
-)
-
-VALID_FILTERS = {
-    "all",
-    "books",
-    "all-hawkins-books",
-    "lectures",
-}
+API = "https://docdocgo.lak.nz/api/search"
+UA = "FriendBot-docdocgo/2.1 (+search-only)"
+VALID_FILTERS = {"all", "books", "all-hawkins-books", "lectures"}
 FILTER_HINTS = {
     "hawkins": "all-hawkins-books",
     "lecture": "lectures",
@@ -36,92 +27,80 @@ FILTER_HINTS = {
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Search docdocgo library (match-centered tooling)",
+        description="Search docdocgo (GET /api/search only)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   ./search.py "nothing is causing anything" 5
-  ./search.py "nothing is causing anything" 3 --expand
   ./search.py "surrender" 5 all-hawkins-books
-  ./search.py "forgiveness" 3 lectures --expand -c 300
+  ./search.py "forgiveness" 3 lectures -c 500
   ./search.py "ego" 5 --partial
-  ./read.py PATH -o OFFSET          # windowed read
-  ./rag.py "query" 3                # semantic chunks
+  ./search.py "love" 5 -p 2
 """,
     )
-    p.add_argument("query", help="Search text (prefer a real phrase, ≥4 chars)")
-    p.add_argument("limit", nargs="?", type=int, default=5, help="Results to show (default 5)")
-    p.add_argument(
-        "filter",
-        nargs="?",
-        default="all",
-        help="all | books | all-hawkins-books | lectures | source path name",
-    )
-    p.add_argument("-p", "--page", type=int, default=1, help="Page number (default 1)")
+    p.add_argument("query")
+    p.add_argument("limit", nargs="?", type=int, default=5)
+    p.add_argument("filter", nargs="?", default="all")
+    p.add_argument("-p", "--page", type=int, default=1)
     p.add_argument(
         "-c",
         "--context",
         type=int,
-        default=300,
-        help=(
-            "API context chars (default 300). WARNING: large values (e.g. 1200) "
-            "make multi-word grouping span distant hits and look like file-start junk. "
-            "Prefer --expand for long passages."
-        ),
+        default=400,
+        help="Snippet padding around match (default 400). Safe to raise; grouping is separate server-side.",
     )
     p.add_argument(
-        "--expand",
-        action="store_true",
-        help="Re-center each hit via /api/read around exact phrase or densest terms",
-    )
-    p.add_argument("--before", type=int, default=500, help="With --expand: chars before match")
-    p.add_argument("--after", type=int, default=1000, help="With --expand: chars after match")
-    p.add_argument(
-        "--max-chars",
+        "-g",
+        "--group-distance",
         type=int,
-        default=3500,
-        help="With --expand: max passage size (default 3500)",
+        default=None,
+        help="Optional groupDistance (server default 250). Rarely needed.",
     )
-    p.add_argument("--full", action="store_true", help="Do not locally truncate API snippets")
+    p.add_argument("--full", action="store_true", help="Do not locally truncate display")
     p.add_argument("--partial", action="store_true", help="wholeWords=false")
     p.add_argument("--case-sensitive", action="store_true")
     p.add_argument("--regex", action="store_true")
-    p.add_argument("--json", action="store_true", help="Raw JSON (search only)")
-    p.add_argument("--no-clean", action="store_true", help="Keep WEBVTT timestamps in expand")
+    p.add_argument("--json", action="store_true")
     return p
+
+
+def highlight(snippet: str, query: str) -> str:
+    if not snippet or not query:
+        return snippet
+    m = re.search(re.escape(query.strip()), snippet, flags=re.IGNORECASE)
+    if not m:
+        # loose whitespace
+        pat = r"\s+".join(re.escape(w) for w in query.split())
+        m = re.search(pat, snippet, flags=re.IGNORECASE)
+    if not m:
+        return snippet
+    a, b = m.span()
+    return f"{snippet[:a]}>>>{snippet[a:b]}<<<{snippet[b:]}"
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     query = (args.query or "").strip()
     if not query:
-        print('Usage: ./search.py "query" [limit] [filter] [options]', file=sys.stderr)
+        print('Usage: ./search.py "query" [limit] [filter]', file=sys.stderr)
         return 2
     if len(query) < 4 and not args.regex:
-        print(
-            "⚠️  Query under 4 chars — prefer fuller phrases.",
-            file=sys.stderr,
-        )
+        print("⚠️  Query under 4 chars — API may return nothing.", file=sys.stderr)
 
     filt = (args.filter or "all").strip()
     if filt in FILTER_HINTS:
         hint = FILTER_HINTS[filt]
-        print(f"⚠️  Filter '{filt}' → using '{hint}' instead.")
+        print(f"⚠️  Filter '{filt}' → '{hint}'")
         filt = hint
-    elif filt not in VALID_FILTERS and filt != "all":
+    elif filt not in VALID_FILTERS:
         print(
-            f"ℹ️  Filter '{filt}' is not a known preset "
-            f"({', '.join(sorted(VALID_FILTERS))}). Typos silent-empty."
+            f"ℹ️  Filter '{filt}' not a preset ({', '.join(sorted(VALID_FILTERS))}). "
+            "Typos may empty-result (API may include warning)."
         )
 
     limit = max(1, min(int(args.limit or 5), 25))
     page = max(1, int(args.page or 1))
-    context = int(args.context if args.context and args.context > 0 else 300)
-    if context > 500 and not args.expand:
-        print(
-            f"⚠️  context={context} can produce sparse multi-word groups that look "
-            "like lecture intros. Prefer default 300 + --expand for long quotes."
-        )
+    context = int(args.context if args.context and args.context > 0 else 400)
 
     params: dict = {
         "q": query,
@@ -130,6 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         "filter": filt,
         "context": context,
     }
+    if args.group_distance and args.group_distance > 0:
+        params["groupDistance"] = int(args.group_distance)
     if args.partial:
         params["wholeWords"] = "false"
     if args.case_sensitive:
@@ -138,146 +119,107 @@ def main(argv: list[str] | None = None) -> int:
         params["useRegex"] = "true"
 
     print()
-    print(f'🔍  docdocgo › "{query}"')
+    print(f'🔍  docdocgo search › "{query}"')
     extras = []
     if args.partial:
         extras.append("partial")
-    if args.expand:
-        extras.append("EXPAND")
     if args.case_sensitive:
         extras.append("case")
     if args.regex:
         extras.append("regex")
     extra_s = f" | {', '.join(extras)}" if extras else ""
-    print(
-        f"    Limit: {limit} | Filter: {filt} | Page: {page} | Context: {context}{extra_s}"
-    )
-    print("    tools: search.py | read.py | rag.py")
+    print(f"    Limit: {limit} | Filter: {filt} | Page: {page} | Context: {context}{extra_s}")
+    print("    Endpoint: GET /api/search only")
     print()
 
+    url = f"{API}?{urllib.parse.urlencode(params)}"
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
     try:
-        data = http_get_json("/api/search", params)
+        with urllib.request.urlopen(req, timeout=45) as r:
+            data = json.loads(r.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"❌  HTTP {e.code}: {e.read().decode(errors='replace')[:300]}", file=sys.stderr)
+        return 1
     except Exception as e:  # noqa: BLE001
-        print(f"❌  Request failed: {e}", file=sys.stderr)
+        print(f"❌  {e}", file=sys.stderr)
         return 1
 
     if args.json:
         print(json.dumps(data, indent=2)[:12000])
         return 0
 
+    if data.get("warning"):
+        w = data["warning"]
+        print(f"⚠️  API warning: {w.get('message')}")
+        if w.get("hint"):
+            print(f"    {w['hint']}")
+        print()
+
     results = data.get("results") or []
     total_matches = int(data.get("total_matches") or 0)
     total_files = int(data.get("files_count") or 0)
-    api_total_pages = data.get("total_pages")
-    real_pages = max(1, (total_matches + limit - 1) // limit) if total_matches else 0
+    total_pages = int(data.get("total_pages") or 0)
     page_n = int(data.get("page") or page)
+    opts = data.get("options") or {}
 
-    plural = "match" if total_matches == 1 else "matches"
-    file_plural = "file" if total_files == 1 else "files"
-    print(f"📚  {total_matches:,} {plural} across {total_files} {file_plural}")
+    print(f"📚  {total_matches:,} matches across {total_files} files")
     if total_matches:
         print(
-            f"📄  Page {page_n} · showing up to {limit} · ~{real_pages} page(s) "
-            f"(ignore API total_pages={api_total_pages!r})"
+            f"📄  Page {page_n}/{max(total_pages, 1)} · limit {limit} · "
+            f"contextChars={opts.get('contextChars')} · groupDistance={opts.get('groupDistance')}"
         )
     print()
 
     if not results:
-        print("   No results found.")
-        print()
-        print("   Try: simpler synonym · --partial · filter all · ./rag.py \"...\"")
+        print("   No results.")
+        print("   Try: simpler phrase · --partial · filter all · different synonym")
         print()
         return 0
 
-    terms = query_terms(query)
-    sparse_warned = False
-
     for i, row in enumerate(results[:limit], 1):
         path = row.get("path", "unknown")
-        match_count = row.get("match_count", 0)
-        score = row.get("score", 0)
+        display = (
+            str(path)
+            .replace("_enxautogen_html", "")
+            .replace("_html", "")
+            .replace("_", " ")
+            .strip()
+        )
+        display = " ".join(w.capitalize() for w in display.split())
         snippet = (row.get("snippet") or "").strip()
-        chapter = row.get("chapter") or ""
-        match_text = row.get("match_text") or []
-        proximity = row.get("proximity", "")
-        offset = row.get("offset", "")
-        display = clean_display_path(str(path))
+        if snippet.startswith("..."):
+            snippet = snippet[3:]
+        if snippet.endswith("..."):
+            snippet = snippet[:-3]
+        snippet = snippet.strip()
+        shown = highlight(snippet, query)
+        if not args.full and len(shown) > 500:
+            hi = shown.find(">>>")
+            if hi >= 0:
+                left = max(0, hi - 160)
+                shown = ("..." if left else "") + shown[left : left + 500] + "..."
+            else:
+                shown = shown[:500] + "..."
 
         print(f"╭──  #{i}  ───────────────────────────────")
         print(f"│ 📄 {display}")
         print(f"│ 🔗 path: {path}")
-        if chapter:
-            print(f"│ 📖 {chapter}")
-        mtext = ", ".join(f'"{w}"' for w in match_text)
-        try:
-            prox_n = int(proximity) if proximity != "" else 0
-        except (TypeError, ValueError):
-            prox_n = 0
-        sparse = prox_n > max(800, context * 2)
-        prox_note = f" | proximity {proximity}"
-        if sparse:
-            prox_note += " ⚠️ SPARSE (words far apart — use --expand)"
-            sparse_warned = True
-        print(f"│ 🎯 {match_count} matches | score {score}{prox_note}")
-        print(f"│ 📍 offset: {offset} | keywords: {mtext}")
-        print(f"│ 📎 expand: ./read.py {path} -o {offset} -q {query!r}")
-
-        if args.expand:
-            try:
-                exp = expand_passage(
-                    str(path),
-                    query,
-                    offset_hint=int(offset) if offset != "" else None,
-                    before=args.before,
-                    after=args.after,
-                    max_chars=args.max_chars,
-                    clean=not args.no_clean,
-                )
-                print(f"│ ✅ centered via {exp['method']} @ {exp['match_start']}-{exp['match_end']}")
-                print("│")
-                # wrap long lines lightly
-                body = exp["passage"]
-                print(f"│ {body}")
-            except Exception as e:  # noqa: BLE001
-                print(f"│ ❌ expand failed: {e}")
-                if snippet:
-                    print(f"│ fallback snippet: {snippet[:500]}")
-        else:
-            if snippet:
-                clean = snippet
-                if clean.startswith("..."):
-                    clean = clean[3:]
-                if clean.endswith("..."):
-                    clean = clean[:-3]
-                clean = clean.strip()
-                # Prefer local re-center highlight inside API snippet
-                shown = highlight_match(clean, query, terms)
-                if not args.full and len(shown) > 420:
-                    # keep highlight region if present
-                    hi = shown.find(">>>")
-                    if hi >= 0:
-                        left = max(0, hi - 120)
-                        shown = ("..." if left else "") + shown[left : left + 420] + "..."
-                    else:
-                        shown = shown[:420] + "..."
-                print("│")
-                print(f"│ {shown}")
-                if sparse:
-                    print("│")
-                    print("│ 💡 Re-run with --expand to pull the real paragraph around the phrase.")
+        if row.get("chapter"):
+            print(f"│ 📖 {row['chapter']}")
+        mtext = ", ".join(f'"{w}"' for w in (row.get("match_text") or []))
+        print(
+            f"│ 🎯 score {row.get('score')} | matches {row.get('match_count')} | "
+            f"proximity {row.get('proximity')} | offset {row.get('offset')}"
+        )
+        print(f"│ 🔑 {mtext}")
+        if shown:
+            print("│")
+            print(f"│ {shown}")
         print("╰───────────────────────────────────────")
         print()
 
-    if sparse_warned and not args.expand:
-        print("⚠️  One or more hits were sparse multi-word groups.")
-        print(f'   Fix: ./search.py {query!r} {limit} {filt} --expand')
-        print()
-    if real_pages > page_n:
-        print(f"➡️  More: ./search.py {query!r} {limit} {filt} -p {page_n + 1}")
-        print()
-    if not args.expand:
-        print(f'💬  Deep passage: ./search.py {query!r} {limit} {filt} --expand')
-        print(f'🧠  Semantic:     ./rag.py {query!r} 3')
+    if total_pages > page_n:
+        print(f"➡️  Next page: ./search.py {query!r} {limit} {filt} -p {page_n + 1}")
         print()
     return 0
 
