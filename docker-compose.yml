@@ -122,6 +122,7 @@ services:
       - ./agents/agent-3/state:/home/node/.openclaw
       - ./agents/agent-3/workspace:/home/node/.openclaw/workspace
       - ./agents/agent-3/auth:/home/node/.config/openclaw
+      - ./agents/agent-3/gh-config:/home/node/.config/gh
     ports:
       - "18793:18789"
     networks:

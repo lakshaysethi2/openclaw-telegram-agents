@@ -45,3 +45,8 @@ logs/
 tmp/
 .cache/
 .DS_Store
+
+# Per-agent GitHub CLI credentials (Friend Bot etc.)
+agents/*/gh-config/
+agents/*/.gh_token
+agents/*/workspace/.gh_token
