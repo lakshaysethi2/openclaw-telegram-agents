@@ -31,7 +31,8 @@ agents/*/state/**
 !agents/*/state/openclaw.json.example
 agents/*/workspace/**
 # Live persona/identity is local-only (may contain private operator notes).
-# Commit only *.example templates.
+# Commit only *.example templates. Parent dir must be re-included for git.
+!agents/*/workspace/
 !agents/*/workspace/IDENTITY.md.example
 !agents/*/workspace/.gitkeep
 
