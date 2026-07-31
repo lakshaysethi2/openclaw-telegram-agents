@@ -36,6 +36,8 @@ the command, not by the subcommand. Rules:
 ./tts.py "verbatim from one unit" [voice]
 ./giphy.py "term"    # MEDIA:/tmp/openclaw/media/...
 ```
+- **Text + TTS together**: when delivering quotes, attach TTS for the focal
+  quote (`./tts.py "<verbatim text>"`). Members expect audio alongside text.
 
 ## Memory
 `memory_search` or `./bin/rg -n "kw" MEMORY.md memory/`

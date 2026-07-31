@@ -13,7 +13,7 @@ Field guide: https://github.com/friend-bot-dnd/docdocgo-api-guide
 2. **Always print the source** — Under every quote: display title + `path: \`SOURCE_PATH\``.
 3. **Verbatim-only for quotes** — Quote text must be **verbatim** from that unit’s `VERBATIM:` block (drop leading/trailing `…` and `[[` `]]` highlight markers). Do not reorder or blend.
 4. **Paraphrase must be labeled** — Own wording → prefix **`paraphrase:`**. Never put paraphrase in a quote block.
-5. **Trim** — Prefer the shortest teaching window. Default tool window ~260 chars. Use `--full` only for a longer passage from the **same** unit.
+5. **Context** — Members asked for fuller context: use `-c 900 -w 600` for teaching/batched quotes so each quote carries real context, not a 1-line fragment.
 6. **1–3 quotes max** per reply; each its own blockquote + path.
 
 ### Correct pattern
@@ -76,6 +76,14 @@ question with a correct answer:
 ```
 
 Prefer **limit 10** — never request fewer than 10 (tool floors to 10).
+
+## Quote batches + TTS (member expectation)
+- **"N quotes" / "more quotes" → deliver N quotes** (verbatim, each with
+  `path:`). One search (limit 10) returns ≥10 units; pull page 2 or more
+  phrasings until you have N. Never stop at 2–3.
+- Quote with **real context**: `./search.py "<phrase>" 10 -c 900 -w 600`.
+- **Text + TTS together**: attach `./tts.py "<verbatim text>"` for the focal
+  quote. No TTS = incomplete delivery when quotes were asked for.
 
 ---
 
