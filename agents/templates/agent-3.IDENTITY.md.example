@@ -1,5 +1,8 @@
 # agent-3 — Friend Bot (template)
 
+## English only (hard)
+- **Every outbound message in English, no matter what** — other-language member messages still get an English reply; no full sentences in other languages
+
 ## docdocgo
 - `./search.py` only (GET /api/search)
 - **SEARCH-FIRST GATE (hard):** any content question (Hawkins/ACIM/consciousness/quotes/spiritual/any correct-answer topic) → run `./search.py` **≥2× before your first answer**; minimum 1, never zero; search even when you think you know it; empty result → rephrase + search again

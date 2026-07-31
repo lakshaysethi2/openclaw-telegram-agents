@@ -1,75 +1,95 @@
 {
-  "gateway": {
-    "mode": "local",
-    "bind": "lan",
-    "auth": {
-      "mode": "token"
-    },
-    "controlUi": {
-      "allowedOrigins": [
+  // agent-1 - isolated OpenClaw gateway.
+  // Tokens come from agents/agent-1/.env (never commit real tokens).
+  // Telegram allowFrom uses numeric ids only (owner + peer bot ids).
+
+  gateway: {
+    mode: "local",
+    bind: "lan",
+    auth: { mode: "token" },
+    controlUi: {
+      allowedOrigins: [
         "http://127.0.0.1:18789",
         "http://localhost:18789"
-      ]
-    }
-  },
-  "agents": {
-    "defaults": {
-      "workspace": "/home/node/.openclaw/workspace",
-      "heartbeat": {
-        "every": "0m"
-      },
-      "verboseDefault": "off",
-      "reasoningDefault": "off",
-      "thinkingDefault": "off",
-      "blockStreamingDefault": "off"
-    }
-  },
-  "channels": {
-    "defaults": {
-      "botLoopProtection": {
-        "enabled": true,
-        "maxEventsPerWindow": 20,
-        "windowSeconds": 60,
-        "cooldownSeconds": 60
-      }
+      ],
     },
-    "telegram": {
-      "enabled": true,
-      "dmPolicy": "allowlist",
-      "allowFrom": [
+  },
+
+
+  agents: {
+    defaults: {
+      workspace: "/home/node/.openclaw/workspace",
+      heartbeat: { every: "0m" },
+      verboseDefault: "off",
+      reasoningDefault: "off",
+      thinkingDefault: "off",
+      blockStreamingDefault: "off",
+      // model: { primary: "deepseek/deepseek-v4-flash" },
+    },
+  },
+
+  channels: {
+    defaults: {
+      botLoopProtection: {
+        enabled: true,
+        maxEventsPerWindow: 20,
+        windowSeconds: 60,
+        cooldownSeconds: 60,
+      },
+    },
+    telegram: {
+      enabled: true,
+      dmPolicy: "allowlist",
+      allowFrom: [
         "YOUR_TELEGRAM_USER_ID",
+        "PEER_BOT_NUMERIC_ID",
         "PEER_BOT_NUMERIC_ID"
       ],
-      "groupPolicy": "allowlist",
-      "groups": {
+      // groupPolicy=allowlist blocks ALL groups until a real chat id is listed.
+      // Supergroup keys look like "-100xxxxxxxxxx" (not AUDIT_GROUP_CHAT_ID).
+      groupPolicy: "allowlist",
+      groups: {
         "AUDIT_GROUP_CHAT_ID": {
-          "requireMention": true,
-          "allowFrom": [
+          // Plain group text is ignored while requireMention is true.
+          // Test with: @bot_username hello
+          requireMention: true,
+          allowFrom: [
             "YOUR_TELEGRAM_USER_ID",
-            "PEER_BOT_NUMERIC_ID"
-          ]
-        }
+        "PEER_BOT_NUMERIC_ID",
+        "PEER_BOT_NUMERIC_ID"
+          ],
+        },
       },
-      "historyLimit": 0,
-      "streaming": {
-        "mode": "off"
+      // Final-only replies: no partial draft edits / tool-progress spam.
+      streaming: {
+        mode: "off",
       },
-      "heartbeat": {
-        "showOk": false,
-        "showAlerts": false
-      }
-    }
+      // Native Telegram reply_to on the user message (groups + DMs).
+      // first = first chunk only; all = every chunk; off = plain chat messages.
+      replyToMode: "first",
+      heartbeat: {
+        showOk: false,
+        showAlerts: false,
+      },
+      historyLimit: 0,
+    },
   },
-  "tools": {
-    "deny": [
+
+  tools: {
+    // Each gateway is one agent in its own container. Allow that agent
+    // to list/read/send across its OWN sessions (DM vs group, etc.).
+    // Default OpenClaw visibility is "tree" (current + subagents only),
+    // which hides sibling sessions and causes "I don't remember that".
+    sessions: {
+      visibility: "agent",
+    },
+    // Still block gateway multi-agent routing if ever misconfigured.
+    agentToAgent: {
+      enabled: false,
+    },
+    deny: [
       "conversations_send",
       "conversations_turn"
     ],
-    "sessions": {
-      "visibility": "agent"
-    },
-    "agentToAgent": {
-      "enabled": false
-    }
-  }
+  },
 }

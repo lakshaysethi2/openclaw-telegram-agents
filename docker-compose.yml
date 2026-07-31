@@ -105,7 +105,7 @@ services:
       start_period: 20s
 
   agent-3:
-    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    image: openclaw-agent-3:local-ffmpeg
     container_name: openclaw-agent-3
     env_file:
       - agents/agent-3/.env
