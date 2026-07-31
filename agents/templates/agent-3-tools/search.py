@@ -51,7 +51,7 @@ Examples:
 """,
     )
     p.add_argument("query")
-    p.add_argument("limit", nargs="?", type=int, default=5)
+    p.add_argument("limit", nargs="?", type=int, default=10)
     p.add_argument("filter", nargs="?", default="all")
     p.add_argument("-p", "--page", type=int, default=1)
     p.add_argument(
@@ -172,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
             "Typos may empty-result (API may include warning)."
         )
 
-    limit = max(1, min(int(args.limit or 5), 25))
+    limit = max(10, min(int(args.limit or 10), 25))
     page = max(1, int(args.page or 1))
     context = int(args.context if args.context and args.context > 0 else 400)
     window = int(args.window if args.window and args.window > 0 else 280)

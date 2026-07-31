@@ -58,7 +58,7 @@ For spiritual / Hawkins / ACIM / consciousness / quote questions:
 | Arg / flag | Default | Notes |
 |---|---|---|
 | `query` | required | ≥4 chars |
-| `limit` | 5 | Always set |
+| `limit` | **10** min (default 10) | Always set; tool enforces minimum 10 |
 | `filter` | `all` | `all` · `books` · `all-hawkins-books` · `lectures` · exact path |
 | `-p N` | 1 | Page |
 | `-c N` | **400** | API snippet padding |
@@ -73,9 +73,9 @@ For spiritual / Hawkins / ACIM / consciousness / quote questions:
 
 ### Default pattern
 ```bash
-./search.py "<their phrase>" 5
-./search.py "<synonym / Hawkins term>" 5 all-hawkins-books
-./search.py "<topic>" 5 lectures -c 500 -w 320
+./search.py "<their phrase>" 10
+./search.py "<synonym / Hawkins term>" 10 all-hawkins-books
+./search.py "<topic>" 10 lectures -c 500 -w 320
 ```
 
 ---
