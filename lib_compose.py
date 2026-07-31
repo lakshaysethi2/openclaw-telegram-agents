@@ -14,10 +14,16 @@ from lib_models import AgentSpec, StackSpec
 def _service_block(agent: AgentSpec) -> str:
     """Render one compose service for ``agent``."""
     net = f"{agent.name.replace('-', '_')}_net"
+    image = agent.image or "${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}"
+    gh_config = (
+        f"            - ./agents/{agent.name}/gh-config:/home/node/.config/gh\n"
+        if "discord" in agent.channels
+        else ""
+    )
     return dedent(
         f"""
         {agent.name}:
-          image: ${{OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}}
+          image: {image}
           container_name: openclaw-{agent.name}
           env_file:
             - agents/{agent.name}/.env
@@ -34,7 +40,7 @@ def _service_block(agent: AgentSpec) -> str:
             - ./agents/{agent.name}/state:/home/node/.openclaw
             - ./agents/{agent.name}/workspace:/home/node/.openclaw/workspace
             - ./agents/{agent.name}/auth:/home/node/.config/openclaw
-          ports:
+{gh_config}          ports:
             - "{agent.host_port}:18789"
           networks:
             - {net}

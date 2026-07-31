@@ -55,6 +55,7 @@ class AgentSpec:
         channels: Enabled channel ids (subset of ``telegram``, ``discord``).
         discord_bot_token: Discord bot token or placeholder (never commit real values).
         discord_guild_id: Primary Discord guild/server id or placeholder.
+        image: Optional per-agent container image override (e.g. local ffmpeg build).
     """
 
     index: int
@@ -72,6 +73,7 @@ class AgentSpec:
     channels: tuple[str, ...] = ("telegram",)
     discord_bot_token: str = ""
     discord_guild_id: str = "YOUR_DISCORD_GUILD_ID"
+    image: str = ""
 
     def __post_init__(self) -> None:
         """Normalize and validate channel flags."""

@@ -90,6 +90,10 @@ def build_default_stack(
             channels = ("discord", "telegram")
             persona = "Friend Bot for Discord community"
             discord_token = f"REPLACE_WITH_{name.upper().replace('-', '_')}_DISCORD_BOT_TOKEN"
+        image = ""
+        if friend_bot and i == 3:
+            # Local build with ffmpeg for voice/media delivery.
+            image = "openclaw-agent-3:local-ffmpeg"
         agents.append(
             AgentSpec(
                 index=i,
@@ -101,6 +105,7 @@ def build_default_stack(
                 persona=persona,
                 channels=channels,
                 discord_bot_token=discord_token,
+                image=image,
             )
         )
     return StackSpec(
@@ -180,6 +185,7 @@ def write_stack_files(
                 f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_DISCORD_BOT_TOKEN"
             ),
             discord_guild_id="YOUR_DISCORD_GUILD_ID",
+            image=agent.image,
         )
         example_stack = StackSpec(
             agents=tuple(
@@ -198,6 +204,7 @@ def write_stack_files(
                     model_primary=a.model_primary,
                     context_tokens=a.context_tokens,
                     discord_guild_id="YOUR_DISCORD_GUILD_ID",
+                    image=a.image,
                 )
                 for a in stack.agents
             ),
