@@ -52,6 +52,9 @@ class AgentSpec:
         model_primary: OpenClaw model ref ``provider/model``, or empty.
         context_tokens: Optional runtime context cap (agents.defaults.contextTokens).
         persona: Optional one-line role text for IDENTITY.md.
+        channels: Enabled channel ids (subset of ``telegram``, ``discord``).
+        discord_bot_token: Discord bot token or placeholder (never commit real values).
+        discord_guild_id: Primary Discord guild/server id or placeholder.
     """
 
     index: int
@@ -66,12 +69,40 @@ class AgentSpec:
     model_primary: str = ""
     context_tokens: int | None = None
     persona: str = ""
+    channels: tuple[str, ...] = ("telegram",)
+    discord_bot_token: str = ""
+    discord_guild_id: str = "YOUR_DISCORD_GUILD_ID"
+
+    def __post_init__(self) -> None:
+        """Normalize and validate channel flags."""
+        allowed = {"telegram", "discord"}
+        raw = tuple(str(c).strip().lower() for c in self.channels if str(c).strip())
+        if not raw:
+            raw = ("telegram",)
+        unknown = [c for c in raw if c not in allowed]
+        if unknown:
+            raise ValidationError(
+                f"Unknown channels for {self.name}: {unknown!r}.",
+                code="AGENT_BAD_CHANNEL",
+                hint="Use only: telegram, discord.",
+            )
+        # freeze normalized unique order
+        object.__setattr__(self, "channels", tuple(dict.fromkeys(raw)))
+
+    def uses_telegram(self) -> bool:
+        """True when Telegram channel should be configured."""
+        return "telegram" in self.channels
+
+    def uses_discord(self) -> bool:
+        """True when Discord channel should be configured."""
+        return "discord" in self.channels
 
     def to_public_dict(self) -> dict[str, Any]:
         """Return a JSON-safe dict with secrets removed."""
         data = asdict(self)
         data["telegram_bot_token"] = "***REDACTED***"
         data["gateway_token"] = "***REDACTED***"
+        data["discord_bot_token"] = "***REDACTED***" if data.get("discord_bot_token") else ""
         if data.get("provider_api_key"):
             data["provider_api_key"] = "***REDACTED***"
         return data

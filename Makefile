@@ -15,7 +15,7 @@ FROM ?= agent-1
 TO_USER ?=
 SERVICE ?=
 
-.PHONY: help setup generate up down restart ps logs pull config health \
+.PHONY: help setup generate generate-friend-bot up down restart ps logs pull config health \
 	test lint fmt test-a2a enable-deepseek enable_deepseek clean \
 	chown-agents fix-perms doctor
 

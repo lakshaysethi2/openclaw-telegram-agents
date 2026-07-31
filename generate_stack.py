@@ -5,6 +5,7 @@ Writes docker-compose.yml, agent dirs, env examples, openclaw.json, IDENTITY.md.
 
 Example:
     python generate_stack.py --agents 2 --owner-id 123456789
+    python generate_stack.py --friend-bot --owner-id 123456789
 """
 
 from __future__ import annotations
@@ -48,22 +49,27 @@ def build_default_stack(
     tokens: list[str] | None = None,
     bot_ids: list[str] | None = None,
     write_live_env: bool = False,
+    friend_bot: bool = False,
 ) -> StackSpec:
     """Build a StackSpec with placeholders or provided tokens/ids.
 
     Args:
-        agent_count: Number of agents (>= 2).
+        agent_count: Number of agents (>= 2). Ignored when friend_bot is True
+            (always 3: two Telegram agents + Discord Friend Bot).
         owner_telegram_id: Human numeric Telegram id or placeholder.
         base_port: Host port for agent-1.
         openclaw_image: Container image.
         tokens: Optional per-agent Telegram bot tokens.
         bot_ids: Optional per-agent numeric bot ids.
         write_live_env: Unused here; retained for call-site clarity.
+        friend_bot: When True, build the 3-agent Friend Bot layout.
 
     Returns:
         Validated StackSpec.
     """
     _ = write_live_env
+    if friend_bot:
+        agent_count = max(agent_count, 3)
     agents: list[AgentSpec] = []
     for i in range(1, agent_count + 1):
         name = agent_slug(i)
@@ -77,6 +83,13 @@ def build_default_stack(
             if bot_ids and i - 1 < len(bot_ids)
             else f"REPLACE_WITH_{name.upper().replace('-', '_')}_BOT_NUMERIC_ID"
         )
+        channels: tuple[str, ...] = ("telegram",)
+        persona = ""
+        discord_token = ""
+        if friend_bot and i == 3:
+            channels = ("discord", "telegram")
+            persona = "Friend Bot for Discord community"
+            discord_token = f"REPLACE_WITH_{name.upper().replace('-', '_')}_DISCORD_BOT_TOKEN"
         agents.append(
             AgentSpec(
                 index=i,
@@ -85,6 +98,9 @@ def build_default_stack(
                 telegram_bot_token=token,
                 gateway_token=secrets.token_urlsafe(24),
                 bot_numeric_id=bot_id,
+                persona=persona,
+                channels=channels,
+                discord_bot_token=discord_token,
             )
         )
     return StackSpec(
@@ -137,9 +153,63 @@ def write_stack_files(
             directory.mkdir(parents=True, exist_ok=True)
 
         (agent_auth_dir(agent.name, base) / ".gitkeep").write_text("", encoding="utf-8")
+        (agent_state_dir(agent.name, base) / ".gitkeep").write_text("", encoding="utf-8")
+        (agent_workspace_dir(agent.name, base) / ".gitkeep").write_text("", encoding="utf-8")
         cfg = openclaw_config_path(agent.name, base)
         cfg.write_text(render_openclaw_json(stack, agent), encoding="utf-8")
         written.append(cfg)
+
+        # Public-safe example beside live config (live path is gitignored).
+        example_agent = AgentSpec(
+            index=agent.index,
+            name=agent.name,
+            host_port=agent.host_port,
+            telegram_bot_token=(
+                f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_TELEGRAM_BOT_TOKEN"
+            ),
+            gateway_token=f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_GATEWAY_TOKEN",
+            bot_numeric_id="PEER_BOT_NUMERIC_ID",
+            bot_username="",
+            provider_api_key="",
+            provider_name=agent.provider_name,
+            model_primary=agent.model_primary,
+            context_tokens=agent.context_tokens,
+            persona=agent.persona,
+            channels=agent.channels,
+            discord_bot_token=(
+                f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_DISCORD_BOT_TOKEN"
+            ),
+            discord_guild_id="YOUR_DISCORD_GUILD_ID",
+        )
+        example_stack = StackSpec(
+            agents=tuple(
+                example_agent
+                if a.name == agent.name
+                else AgentSpec(
+                    index=a.index,
+                    name=a.name,
+                    host_port=a.host_port,
+                    telegram_bot_token="REPLACE",
+                    gateway_token="REPLACE",
+                    bot_numeric_id="PEER_BOT_NUMERIC_ID",
+                    channels=a.channels,
+                    persona=a.persona,
+                    provider_name=a.provider_name,
+                    model_primary=a.model_primary,
+                    context_tokens=a.context_tokens,
+                    discord_guild_id="YOUR_DISCORD_GUILD_ID",
+                )
+                for a in stack.agents
+            ),
+            owner_telegram_id="YOUR_TELEGRAM_USER_ID",
+            openclaw_image=stack.openclaw_image,
+            base_port=stack.base_port,
+            audit_group_chat_id="AUDIT_GROUP_CHAT_ID",
+            llm_provider=stack.llm_provider,
+        )
+        cfg_example = agent_state_dir(agent.name, base) / "openclaw.json.example"
+        cfg_example.write_text(render_openclaw_json(example_stack, example_agent), encoding="utf-8")
+        written.append(cfg_example)
 
         identity = agent_workspace_dir(agent.name, base) / "IDENTITY.md"
         identity.write_text(render_identity_md(agent, stack), encoding="utf-8")
@@ -181,6 +251,7 @@ def render_stack_public(stack: StackSpec) -> dict:
                 "model_primary": agent.model_primary,
                 "context_tokens": agent.context_tokens,
                 "persona": agent.persona,
+                "channels": list(agent.channels),
             }
             for agent in stack.agents
         ],
@@ -213,6 +284,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Also write agents/*/.env (gitignored).",
     )
+    parser.add_argument(
+        "--friend-bot",
+        action="store_true",
+        help="Include agent-3 Friend Bot (Discord + optional Telegram) layout.",
+    )
     parser.add_argument("--root", default="", help="Optional output root (tests).")
     return parser.parse_args(argv)
 
@@ -230,6 +306,7 @@ def main(argv: list[str] | None = None) -> int:
             base_port=base_port,
             openclaw_image=args.image,
             write_live_env=bool(args.write_live_env),
+            friend_bot=bool(args.friend_bot),
         )
         root = Path(args.root).resolve() if args.root else None
         written = write_stack_files(stack, root=root, write_live_env=bool(args.write_live_env))

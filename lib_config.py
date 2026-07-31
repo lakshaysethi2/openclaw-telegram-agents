@@ -95,13 +95,72 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
     model_block = _model_defaults_block(agent)
     provider_block = _deepseek_provider_block(agent)
     provider_section = f"\n{provider_block}\n" if provider_block else "\n"
+
+    channel_blocks: list[str] = []
+    if agent.uses_telegram():
+        # Enable Telegram when the agent has that channel. Discord-primary agents may
+        # keep telegram listed but disabled until a real bot token is configured.
+        tg_enabled = "true"
+        if agent.uses_discord() and (
+            not agent.telegram_bot_token or agent.telegram_bot_token.startswith("REPLACE_")
+        ):
+            tg_enabled = "false"
+        channel_blocks.append(
+            f"""
+            telegram: {{
+              enabled: {tg_enabled},
+              dmPolicy: "allowlist",
+              allowFrom: [
+                {allow_lines}
+              ],
+              // groupPolicy=allowlist blocks ALL groups until a real chat id is listed.
+              // Supergroup keys look like "-100xxxxxxxxxx" (not AUDIT_GROUP_CHAT_ID).
+              groupPolicy: "allowlist",
+              groups: {{
+                "{group_id}": {{
+                  // Plain group text is ignored while requireMention is true.
+                  // Test with: @bot_username hello
+                  requireMention: true,
+                  allowFrom: [
+                    {allow_lines}
+                  ],
+                }},
+              }},
+              historyLimit: 0,
+            }},"""
+        )
+    if agent.uses_discord():
+        guild_id = agent.discord_guild_id or "YOUR_DISCORD_GUILD_ID"
+        channel_blocks.append(
+            f"""
+            discord: {{
+              enabled: true,
+              // Token from agents/{agent.name}/.env -> DISCORD_BOT_TOKEN
+              token: {{
+                source: "env",
+                provider: "default",
+                id: "DISCORD_BOT_TOKEN",
+              }},
+              dmPolicy: "pairing",
+              groupPolicy: "allowlist",
+              guilds: {{
+                "{guild_id}": {{
+                  requireMention: true,
+                }},
+              }},
+            }},"""
+        )
+    if not channel_blocks:
+        raise ValueError(f"{agent.name} has no channels configured")
+    channels_body = "".join(channel_blocks)
+
     return (
         dedent(
             f"""
         {{
           // {agent.name} - isolated OpenClaw gateway.
           // Tokens come from agents/{agent.name}/.env (never commit real tokens).
-          // allowFrom uses numeric Telegram ids only (owner + peer bot ids).
+          // Telegram allowFrom uses numeric ids only (owner + peer bot ids).
 
           gateway: {{
             mode: "local",
@@ -128,28 +187,7 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
                 windowSeconds: 60,
                 cooldownSeconds: 60,
               }},
-            }},
-            telegram: {{
-              enabled: true,
-              dmPolicy: "allowlist",
-              allowFrom: [
-                {allow_lines}
-              ],
-              // groupPolicy=allowlist blocks ALL groups until a real chat id is listed.
-              // Supergroup keys look like "-100xxxxxxxxxx" (not AUDIT_GROUP_CHAT_ID).
-              groupPolicy: "allowlist",
-              groups: {{
-                "{group_id}": {{
-                  // Plain group text is ignored while requireMention is true.
-                  // Test with: @bot_username hello
-                  requireMention: true,
-                  allowFrom: [
-                    {allow_lines}
-                  ],
-                }},
-              }},
-              historyLimit: 0,
-            }},
+            }},{channels_body}
           }},
 
           tools: {{
@@ -177,22 +215,27 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
 
 def render_agent_env(agent: AgentSpec, *, example: bool = False) -> str:
     """Render ``.env`` or ``.env.example`` body for one agent."""
-    token = (
-        f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_TELEGRAM_BOT_TOKEN"
-        if example
-        else agent.telegram_bot_token
-    )
-    gateway = (
-        f"REPLACE_WITH_{agent.name.upper().replace('-', '_')}_GATEWAY_TOKEN"
-        if example
-        else agent.gateway_token
-    )
+    slug = agent.name.upper().replace("-", "_")
+    gateway = f"REPLACE_WITH_{slug}_GATEWAY_TOKEN" if example else agent.gateway_token
     lines = [
         f"# Secrets for {agent.name}. Real .env is gitignored.",
-        "# TELEGRAM_BOT_TOKEN is the BotFather token for this agent only.",
-        f"TELEGRAM_BOT_TOKEN={token}",
-        f"OPENCLAW_GATEWAY_TOKEN={gateway}",
     ]
+    if agent.uses_discord():
+        lines.append("# Primary community channel may be Discord.")
+        dtoken = (
+            f"REPLACE_WITH_{slug}_DISCORD_BOT_TOKEN"
+            if example
+            else (agent.discord_bot_token or f"REPLACE_WITH_{slug}_DISCORD_BOT_TOKEN")
+        )
+        lines.append(f"DISCORD_BOT_TOKEN={dtoken}")
+    if agent.uses_telegram():
+        lines.append("# TELEGRAM_BOT_TOKEN is the BotFather token for this agent only.")
+        ttoken = f"REPLACE_WITH_{slug}_TELEGRAM_BOT_TOKEN" if example else agent.telegram_bot_token
+        lines.append(f"TELEGRAM_BOT_TOKEN={ttoken}")
+    elif example:
+        lines.append("# Optional Telegram bot if this agent later joins the A2A mesh.")
+        lines.append(f"# TELEGRAM_BOT_TOKEN=REPLACE_WITH_{slug}_TELEGRAM_BOT_TOKEN")
+    lines.append(f"OPENCLAW_GATEWAY_TOKEN={gateway}")
     if agent.provider_name == "deepseek" or agent.model_primary.startswith("deepseek/"):
         if example:
             lines.append("DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY")
@@ -223,6 +266,18 @@ def render_identity_md(agent: AgentSpec, stack: StackSpec) -> str:
         if agent.context_tokens
         else "- Context token cap: provider/model default."
     )
+    channel_bits: list[str] = []
+    if agent.uses_discord():
+        channel_bits.append("Discord")
+    if agent.uses_telegram():
+        channel_bits.append("Telegram")
+    channel_line = (
+        f"- Channels: {', '.join(channel_bits)}." if channel_bits else "- Channels: not configured."
+    )
+    peer_line = (
+        f"- Peer agents ({peers}) are reached only over Telegram bot-to-bot messages "
+        "(when Telegram is enabled for this agent)."
+    )
     return (
         dedent(
             f"""
@@ -230,12 +285,13 @@ def render_identity_md(agent: AgentSpec, stack: StackSpec) -> str:
 
         {persona}
 
-        - Peer agents ({peers}) are reached only over Telegram bot-to-bot messages.
+        {channel_line}
+        {peer_line}
         - This container holds only {agent.name}. Use sessions_list + sessions_history
           when the human asks about something from another of YOUR chats/sessions
           (for example a group vs a DM). Those tools see this agent's sessions only.
-        - Do not invent a path to peer agent internals; peers are other bots on Telegram.
-        - Owner Telegram numeric id is allowlisted for human control.
+        - Do not invent a path to peer agent internals; peers are separate agents.
+        - Owner/operator ids are allowlisted for human control where the channel supports it.
         {model_line}
         {ctx_line}
         """
@@ -257,7 +313,10 @@ def render_root_env_example(stack: StackSpec) -> str:
         "# Example keys (filled by make setup / setup_agents.py):",
     ]
     for agent in stack.agents:
-        lines.append(f"# agents/{agent.name}/.env -> TELEGRAM_BOT_TOKEN=...")
+        if agent.uses_discord():
+            lines.append(f"# agents/{agent.name}/.env -> DISCORD_BOT_TOKEN=...")
+        if agent.uses_telegram():
+            lines.append(f"# agents/{agent.name}/.env -> TELEGRAM_BOT_TOKEN=...")
         lines.append(f"# agents/{agent.name}/.env -> OPENCLAW_GATEWAY_TOKEN=...")
         if stack.uses_deepseek():
             lines.append(f"# agents/{agent.name}/.env -> DEEPSEEK_API_KEY=...")

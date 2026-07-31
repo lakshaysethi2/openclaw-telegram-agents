@@ -96,3 +96,37 @@ def test_env_live_deepseek_key() -> None:
     assert "DEEPSEEK_API_KEY=sk-test-deepseek" in live
     assert "sk-test-deepseek" not in example
     assert "DEEPSEEK_API_KEY=REPLACE_WITH_DEEPSEEK_API_KEY" in example
+
+
+def test_discord_friend_bot_channel_render() -> None:
+    """Discord-primary agent gets discord block and env token slot."""
+    a1 = AgentSpec(
+        index=1,
+        name="agent-1",
+        host_port=18791,
+        telegram_bot_token="tok-a",
+        gateway_token="gw-a",
+        bot_numeric_id="111",
+    )
+    a3 = AgentSpec(
+        index=3,
+        name="agent-3",
+        host_port=18793,
+        telegram_bot_token="REPLACE_WITH_AGENT_3_TELEGRAM_BOT_TOKEN",
+        gateway_token="gw-c",
+        bot_numeric_id="333",
+        channels=("discord", "telegram"),
+        discord_bot_token="REPLACE_WITH_AGENT_3_DISCORD_BOT_TOKEN",
+        discord_guild_id="123456789012345678",
+        persona="Friend Bot",
+    )
+    stack = StackSpec(agents=(a1, a3), owner_telegram_id="999")
+    text = render_openclaw_json(stack, a3)
+    assert "discord:" in text
+    assert "DISCORD_BOT_TOKEN" in text
+    assert '"123456789012345678"' in text
+    assert "telegram:" in text
+    assert "enabled: false" in text  # telegram placeholder => disabled
+    env = render_agent_env(a3, example=True)
+    assert "DISCORD_BOT_TOKEN=REPLACE_WITH_AGENT_3_DISCORD_BOT_TOKEN" in env
+    assert "TELEGRAM_BOT_TOKEN=REPLACE_WITH_AGENT_3_TELEGRAM_BOT_TOKEN" in env

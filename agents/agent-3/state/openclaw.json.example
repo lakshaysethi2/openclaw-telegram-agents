@@ -1,83 +1,126 @@
 {
-  "gateway": {
-    "mode": "local",
-    "bind": "lan",
-    "auth": {
-      "mode": "token"
-    },
-    "controlUi": {
-      "allowedOrigins": [
-        "http://127.0.0.1:18793",
-        "http://localhost:18793"
-      ]
-    }
-  },
-  "agents": {
-    "defaults": {
-      "workspace": "/home/node/.openclaw/workspace",
-      "heartbeat": {
-        "every": "0m"
-      },
-      "model": {
-        "primary": "deepseek/deepseek-v4-flash"
-      },
-      "contextTokens": 128000
-    }
-  },
-  "channels": {
-    "defaults": {
-      "botLoopProtection": {
-        "enabled": true,
-        "maxEventsPerWindow": 20,
-        "windowSeconds": 60,
-        "cooldownSeconds": 60
-      }
-    },
-    "discord": {
-      "enabled": true,
-      "token": {
-        "source": "env",
-        "provider": "default",
-        "id": "DISCORD_BOT_TOKEN"
-      },
-      "dmPolicy": "pairing",
-      "groupPolicy": "allowlist",
-      "guilds": {
-        "YOUR_DISCORD_GUILD_ID": {
-          "requireMention": true
-        }
-      }
-    },
-    "telegram": {
-      "enabled": false,
-      "dmPolicy": "allowlist",
-      "allowFrom": [
-        "YOUR_TELEGRAM_USER_ID",
-        "PEER_BOT_NUMERIC_ID"
+          // agent-3 - isolated OpenClaw gateway.
+          // Tokens come from agents/agent-3/.env (never commit real tokens).
+          // Telegram allowFrom uses numeric ids only (owner + peer bot ids).
+
+          gateway: {
+            mode: "local",
+            bind: "lan",
+            auth: { mode: "token" },
+            controlUi: {
+              allowedOrigins: [
+                "http://127.0.0.1:18793",
+                "http://localhost:18793",
+                "http://127.0.0.1:18789",
+                "http://localhost:18789"
+              ],
+            },
+          },
+
+
+models: {
+  mode: "merge",
+  providers: {
+    deepseek: {
+      // Auth: process env DEEPSEEK_API_KEY from agents/<name>/.env
+      baseUrl: "https://api.deepseek.com",
+      api: "openai-completions",
+      models: [
+        {
+          id: "deepseek-v4-flash",
+          name: "DeepSeek V4 Flash",
+          input: ["text"],
+          contextWindow: 1000000,
+          maxTokens: 384000,
+        },
+        {
+          id: "deepseek-v4-pro",
+          name: "DeepSeek V4 Pro",
+          input: ["text"],
+          contextWindow: 1000000,
+          maxTokens: 384000,
+        },
       ],
-      "groupPolicy": "allowlist",
-      "groups": {
-        "AUDIT_GROUP_CHAT_ID": {
-          "requireMention": true,
-          "allowFrom": [
-            "YOUR_TELEGRAM_USER_ID",
-            "PEER_BOT_NUMERIC_ID"
-          ]
-        }
-      },
-      "historyLimit": 0
-    }
-  },
-  "tools": {
-    "deny": [
-      "conversations_send",
-      "conversations_turn"
-    ],
-    "sessions": {
-      "visibility": "agent"
     },
-    "agentToAgent": {
-      "enabled": false
-    }
-  }
-}
+  },
+},
+
+          agents: {
+            defaults: {
+              workspace: "/home/node/.openclaw/workspace",
+              heartbeat: { every: "0m" },
+              model: { primary: "deepseek/deepseek-v4-flash" },
+              contextTokens: 128000,
+            },
+          },
+
+          channels: {
+            defaults: {
+              botLoopProtection: {
+                enabled: true,
+                maxEventsPerWindow: 20,
+                windowSeconds: 60,
+                cooldownSeconds: 60,
+              },
+            },
+            telegram: {
+              enabled: false,
+              dmPolicy: "allowlist",
+              allowFrom: [
+                "YOUR_TELEGRAM_USER_ID",
+                "PEER_BOT_NUMERIC_ID",
+                "PEER_BOT_NUMERIC_ID"
+              ],
+              // groupPolicy=allowlist blocks ALL groups until a real chat id is listed.
+              // Supergroup keys look like "-100xxxxxxxxxx" (not AUDIT_GROUP_CHAT_ID).
+              groupPolicy: "allowlist",
+              groups: {
+                "AUDIT_GROUP_CHAT_ID": {
+                  // Plain group text is ignored while requireMention is true.
+                  // Test with: @bot_username hello
+                  requireMention: true,
+                  allowFrom: [
+                    "YOUR_TELEGRAM_USER_ID",
+                "PEER_BOT_NUMERIC_ID",
+                "PEER_BOT_NUMERIC_ID"
+                  ],
+                },
+              },
+              historyLimit: 0,
+            },
+            discord: {
+              enabled: true,
+              // Token from agents/agent-3/.env -> DISCORD_BOT_TOKEN
+              token: {
+                source: "env",
+                provider: "default",
+                id: "DISCORD_BOT_TOKEN",
+              },
+              dmPolicy: "pairing",
+              groupPolicy: "allowlist",
+              guilds: {
+                "YOUR_DISCORD_GUILD_ID": {
+                  requireMention: true,
+                },
+              },
+            },
+          },
+
+          tools: {
+            // Each gateway is one agent in its own container. Allow that agent
+            // to list/read/send across its OWN sessions (DM vs group, etc.).
+            // Default OpenClaw visibility is "tree" (current + subagents only),
+            // which hides sibling sessions and causes "I don't remember that".
+            sessions: {
+              visibility: "agent",
+            },
+            // Still block gateway multi-agent routing if ever misconfigured.
+            agentToAgent: {
+              enabled: false,
+            },
+            deny: [
+              "conversations_send",
+              "conversations_turn"
+            ],
+          },
+        }
