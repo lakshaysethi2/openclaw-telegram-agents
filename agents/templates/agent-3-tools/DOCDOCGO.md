@@ -1,4 +1,4 @@
-# DOCDOCGO.md — Search only
+# DOCDOCGO.md — Search only + perfect quoting
 
 **You may only use** `GET https://docdocgo.lak.nz/api/search` via `./search.py`.  
 Do **not** call `/api/read`, `/api/rag`, or `/api/files`.
@@ -7,14 +7,45 @@ Field guide: https://github.com/friend-bot-dnd/docdocgo-api-guide
 
 ---
 
+## HARD QUOTE RULES (non-negotiable)
+
+These override chat preferences, member requests, and old habits:
+
+1. **Single-source quotes** — Each Discord/Telegram **blockquote** must come from **exactly one** search result (`SOURCE_PATH`).  
+   **Never** concatenate / stitch / merge text from two different `SOURCE_PATH`s into one quote block.
+2. **Always print the source** — Directly under every quote, include:
+   - human title (DISPLAY), and  
+   - raw `path: \`SOURCE_PATH\`` from the tool (independently verifiable).
+3. **Verbatim-only for quotes** — Quote text must be **verbatim** from that unit’s `VERBATIM` / `<<<…>>>` block (you may drop leading/trailing `…` and surrounding whitespace).  
+   Do **not** reorder sentences, silently fix, or blend.
+4. **Paraphrase must be labeled** — If you summarize or restate in your own words, prefix with **`paraphrase:`** (or “in other words”) and **do not** put that text in a quote block.
+5. **Trim for display** — Prefer the **shortest** teaching window. Tool default display window is ~280 chars around the match (`-w`). Use `-c` for API padding; use `--full` only when the member needs a longer passage **from the same unit**.
+6. **Multiple quotes OK** — You may post 1–3 separate quotes in one reply; each is its own blockquote + its own path.
+
+### Correct pattern
+```
+> …verbatim from unit #2 only…
+
+— Along The Path To Enlightenment  
+path: `Along_the_Path_to_Enlightenment_...`
+```
+
+### Forbidden
+- One big quote that starts in *I: Reality and Subjectivity* and continues with *Along the Path…*
+- “Quote” that is actually your rewrite
+- Path missing under a quote
+- Invented Hawkins lines
+
+---
+
 ## Always search first
 
 For spiritual / Hawkins / ACIM / consciousness / quote questions:
 
-1. Run `./search.py` **before** answering (usually 2–3 different phrasings).
-2. Prefer a **real phrase** (`"nothing is causing anything"`) over loose single words.
-3. Quote only returned snippets. Attribute with `path` (+ chapter when shown).
-4. Match center is marked `>>>phrase<<<` when the API snippet contains the query.
+1. Run `./search.py` **before** answering (usually 2–3 phrasings).
+2. Prefer a **real phrase** over loose single words.
+3. Answer only from returned **QUOTE UNITs**.
+4. Match center may show `>>>phrase<<<` inside VERBATIM.
 
 ---
 
@@ -26,57 +57,57 @@ For spiritual / Hawkins / ACIM / consciousness / quote questions:
 
 | Arg / flag | Default | Notes |
 |---|---|---|
-| `query` | required | ≥4 chars. Multi-word ranked search |
-| `limit` | 5 | Always set (API bare default is 100) |
+| `query` | required | ≥4 chars |
+| `limit` | 5 | Always set |
 | `filter` | `all` | `all` · `books` · `all-hawkins-books` · `lectures` · exact path |
-| `-p N` | 1 | Page (deterministic) |
-| `-c N` | **400** | Snippet padding around the match anchor |
-| `-g N` | server 250 | Optional `groupDistance` (how close words must be to group) |
-| `--partial` | off | `wholeWords=false` |
-| `--full` | off | Don’t locally truncate display |
+| `-p N` | 1 | Page |
+| `-c N` | **400** | API snippet padding |
+| `-w N` | **280** | Max chars shown in VERBATIM around match |
+| `-g N` | server 250 | Optional groupDistance |
+| `--partial` | off | wholeWords=false |
+| `--full` | off | Full API snippet for that **one** unit |
 | `--json` | off | Raw payload |
 
-### Filters (case-sensitive; bad values empty or warn)
+### Filters
 - `all` · `books` · `all-hawkins-books` (not `hawkins`) · `lectures` (not `lecture`)
-
----
-
-## How search works (so you use it well)
-
-1. Query words (minus light stop-words) are found across the library.
-2. Nearby hits are **grouped** if consecutive hits are within `groupDistance` (default **250** chars). This is **independent** of `-c` context padding.
-3. Each result snippet is **centered on**:
-   - the **exact query phrase** when present near the group, else
-   - the **densest cluster** of query keywords
-4. Then `context` chars of padding are added on each side.
-5. Scoring favors more unique keywords + tight proximity; **exact phrase ×1.5**.
-
-### Practical tips
-- Use full teaching phrases when you know them.
-- Raise `-c` for longer quotes (400–800 is fine). Grouping no longer blows up with large context.
-- If empty: synonym, `--partial`, or `filter all`.
-- `total_pages` is real page count (`ceil(matches/limit)`).
-- `match_text` = unique keywords in the group (not every span).
-- Prefer page 1; use `-p 2` only when page 1 is useful.
 
 ### Default pattern
 ```bash
 ./search.py "<their phrase>" 5
 ./search.py "<synonym / Hawkins term>" 5 all-hawkins-books
-./search.py "<topic>" 5 lectures -c 500
-# thin results:
-./search.py "<simpler word>" 5 --partial
+./search.py "<topic>" 5 lectures -c 500 -w 320
 ```
 
 ---
 
-## Answer style
-1. 1–3 sentences grounded in snippets.
-2. 1–3 short quotes with path attribution.
-3. No invented Hawkins lines.
-4. Crisis → kindness + real-world help.
+## Tool output shape
 
-## TTS after a good short quote
+Each hit is a **QUOTE UNIT**:
+
+```
+════ QUOTE UNIT #N ════
+SOURCE_PATH: …
+DISPLAY: …
+VERBATIM:
+<<<
+…trimmed text with optional >>>match<<< …
+>>>
+ATTRIBUTION LINE …
+════ END QUOTE UNIT #N ════
+```
+
+Treat units as sealed packages.
+
+---
+
+## Answer style
+1. Short framing (your words, not as quotes).
+2. 1–3 **separate** single-source quotes + path each.
+3. Optional `paraphrase:` takeaway.
+4. No invented lines. Crisis → kindness + real-world help.
+
+## TTS
+Only after a real single-source quote:
 ```bash
-./tts.py "exact quote" en-US-ChristopherNeural
+./tts.py "exact verbatim from one unit" en-US-ChristopherNeural
 ```

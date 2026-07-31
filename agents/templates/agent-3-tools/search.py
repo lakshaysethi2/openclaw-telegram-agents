@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Friend Bot docdocgo tool — GET /api/search ONLY.
 
-No /api/read, /api/rag, or /api/files.
+Each result is emitted as a single-source QUOTE UNIT.
+Never merge units. Always show SOURCE_PATH with any quote.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ import urllib.parse
 import urllib.request
 
 API = "https://docdocgo.lak.nz/api/search"
-UA = "FriendBot-docdocgo/2.1 (+search-only)"
+UA = "FriendBot-docdocgo/2.2 (+search-only; single-source-quotes)"
 VALID_FILTERS = {"all", "books", "all-hawkins-books", "lectures"}
 FILTER_HINTS = {
     "hawkins": "all-hawkins-books",
@@ -24,10 +25,21 @@ FILTER_HINTS = {
     "all_hawkins_books": "all-hawkins-books",
 }
 
+QUOTE_RULES = """\
+╔══════════════════════════════════════════════════════════════════╗
+║  HARD QUOTE RULES (enforce every reply — not optional)           ║
+║  1. ONE SOURCE_PATH per blockquote. Never stitch two paths.      ║
+║  2. Quotes must be VERBATIM from ONE unit's VERBATIM block.      ║
+║  3. Always print SOURCE_PATH next to each quote.                 ║
+║  4. Paraphrase only if labeled "paraphrase:" — never as a quote. ║
+║  5. Prefer the shortest verbatim window that holds the teaching. ║
+║  6. Do not invent, reorder, or merge sentences across units.     ║
+╚══════════════════════════════════════════════════════════════════╝"""
+
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Search docdocgo (GET /api/search only)",
+        description="Search docdocgo (GET /api/search only) — single-source quote units",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -35,7 +47,7 @@ Examples:
   ./search.py "surrender" 5 all-hawkins-books
   ./search.py "forgiveness" 3 lectures -c 500
   ./search.py "ego" 5 --partial
-  ./search.py "love" 5 -p 2
+  ./search.py "love" 5 --window 220
 """,
     )
     p.add_argument("query")
@@ -47,16 +59,23 @@ Examples:
         "--context",
         type=int,
         default=400,
-        help="Snippet padding around match (default 400). Safe to raise; grouping is separate server-side.",
+        help="API snippet padding around match (default 400).",
     )
     p.add_argument(
         "-g",
         "--group-distance",
         type=int,
         default=None,
-        help="Optional groupDistance (server default 250). Rarely needed.",
+        help="Optional groupDistance (server default 250).",
     )
-    p.add_argument("--full", action="store_true", help="Do not locally truncate display")
+    p.add_argument(
+        "-w",
+        "--window",
+        type=int,
+        default=280,
+        help="Max display chars around match for VERBATIM (default 280). Use --full for full snippet.",
+    )
+    p.add_argument("--full", action="store_true", help="Show full API snippet (still one unit/path)")
     p.add_argument("--partial", action="store_true", help="wholeWords=false")
     p.add_argument("--case-sensitive", action="store_true")
     p.add_argument("--regex", action="store_true")
@@ -64,18 +83,73 @@ Examples:
     return p
 
 
-def highlight(snippet: str, query: str) -> str:
+def find_match_span(snippet: str, query: str) -> tuple[int, int] | None:
     if not snippet or not query:
-        return snippet
-    m = re.search(re.escape(query.strip()), snippet, flags=re.IGNORECASE)
-    if not m:
-        # loose whitespace
-        pat = r"\s+".join(re.escape(w) for w in query.split())
+        return None
+    q = query.strip()
+    m = re.search(re.escape(q), snippet, flags=re.IGNORECASE)
+    if m:
+        return m.span()
+    words = [w for w in q.split() if w]
+    if len(words) >= 2:
+        pat = r"\s+".join(re.escape(w) for w in words)
         m = re.search(pat, snippet, flags=re.IGNORECASE)
-    if not m:
+        if m:
+            return m.span()
+    # densest-ish: first keyword
+    for w in words:
+        m = re.search(rf"\b{re.escape(w)}\b", snippet, flags=re.IGNORECASE)
+        if m:
+            return m.span()
+    return None
+
+
+def highlight(snippet: str, span: tuple[int, int] | None) -> str:
+    if not span:
         return snippet
-    a, b = m.span()
+    a, b = span
     return f"{snippet[:a]}>>>{snippet[a:b]}<<<{snippet[b:]}"
+
+
+def trim_window(snippet: str, span: tuple[int, int] | None, window: int, full: bool) -> str:
+    s = snippet.strip()
+    if full or not s:
+        return s
+    if window <= 0:
+        window = 280
+    if not span:
+        return (s[:window] + ("…" if len(s) > window else "")).strip()
+    a, b = span
+    mid = (a + b) // 2
+    half = max(window // 2, (b - a) + 40)
+    left = max(0, mid - half)
+    right = min(len(s), mid + half)
+    # snap to word-ish boundaries
+    if left > 0:
+        sp = s.find(" ", left)
+        if 0 < sp < left + 40:
+            left = sp + 1
+    if right < len(s):
+        sp = s.rfind(" ", max(left, right - 40), right)
+        if sp > left:
+            right = sp
+    out = s[left:right].strip()
+    if left > 0:
+        out = "…" + out
+    if right < len(s):
+        out = out + "…"
+    return out
+
+
+def display_title(path: str) -> str:
+    display = (
+        str(path)
+        .replace("_enxautogen_html", "")
+        .replace("_html", "")
+        .replace("_", " ")
+        .strip()
+    )
+    return " ".join(w.capitalize() for w in display.split())
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -101,6 +175,7 @@ def main(argv: list[str] | None = None) -> int:
     limit = max(1, min(int(args.limit or 5), 25))
     page = max(1, int(args.page or 1))
     context = int(args.context if args.context and args.context > 0 else 400)
+    window = int(args.window if args.window and args.window > 0 else 280)
 
     params: dict = {
         "q": query,
@@ -119,6 +194,8 @@ def main(argv: list[str] | None = None) -> int:
         params["useRegex"] = "true"
 
     print()
+    print(QUOTE_RULES)
+    print()
     print(f'🔍  docdocgo search › "{query}"')
     extras = []
     if args.partial:
@@ -127,9 +204,14 @@ def main(argv: list[str] | None = None) -> int:
         extras.append("case")
     if args.regex:
         extras.append("regex")
+    if args.full:
+        extras.append("full-snippet")
     extra_s = f" | {', '.join(extras)}" if extras else ""
-    print(f"    Limit: {limit} | Filter: {filt} | Page: {page} | Context: {context}{extra_s}")
-    print("    Endpoint: GET /api/search only")
+    print(
+        f"    Limit: {limit} | Filter: {filt} | Page: {page} | "
+        f"API context: {context} | Display window: {window}{extra_s}"
+    )
+    print("    Endpoint: GET /api/search only · each unit = one SOURCE_PATH")
     print()
 
     url = f"{API}?{urllib.parse.urlencode(params)}"
@@ -177,46 +259,53 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     for i, row in enumerate(results[:limit], 1):
-        path = row.get("path", "unknown")
-        display = (
-            str(path)
-            .replace("_enxautogen_html", "")
-            .replace("_html", "")
-            .replace("_", " ")
-            .strip()
-        )
-        display = " ".join(w.capitalize() for w in display.split())
+        path = str(row.get("path") or "unknown")
+        title = display_title(path)
         snippet = (row.get("snippet") or "").strip()
         if snippet.startswith("..."):
             snippet = snippet[3:]
         if snippet.endswith("..."):
             snippet = snippet[:-3]
-        snippet = snippet.strip()
-        shown = highlight(snippet, query)
-        if not args.full and len(shown) > 500:
-            hi = shown.find(">>>")
-            if hi >= 0:
-                left = max(0, hi - 160)
-                shown = ("..." if left else "") + shown[left : left + 500] + "..."
-            else:
-                shown = shown[:500] + "..."
+        snippet = re.sub(r"\s+", " ", snippet).strip()
 
-        print(f"╭──  #{i}  ───────────────────────────────")
-        print(f"│ 📄 {display}")
-        print(f"│ 🔗 path: {path}")
-        if row.get("chapter"):
-            print(f"│ 📖 {row['chapter']}")
+        span = find_match_span(snippet, query)
+        trimmed = trim_window(snippet, span, window, args.full)
+        # re-find span on trimmed for highlight
+        span2 = find_match_span(trimmed, query) if span else None
+        if span and not span2 and ">>>" not in trimmed:
+            # highlight may fail after trim edge; keep trimmed plain
+            shown = trimmed
+        else:
+            shown = highlight(trimmed, span2)
+
         mtext = ", ".join(f'"{w}"' for w in (row.get("match_text") or []))
+
+        print(f"════ QUOTE UNIT #{i}  (single source — do not merge with other units) ════")
+        print(f"SOURCE_PATH: {path}")
+        print(f"DISPLAY: {title}")
+        if row.get("chapter"):
+            print(f"CHAPTER: {row['chapter']}")
         print(
-            f"│ 🎯 score {row.get('score')} | matches {row.get('match_count')} | "
-            f"proximity {row.get('proximity')} | offset {row.get('offset')}"
+            f"META: score={row.get('score')} matches={row.get('match_count')} "
+            f"proximity={row.get('proximity')} offset={row.get('offset')}"
         )
-        print(f"│ 🔑 {mtext}")
-        if shown:
-            print("│")
-            print(f"│ {shown}")
-        print("╰───────────────────────────────────────")
+        print(f"KEYWORDS: {mtext}")
+        print("VERBATIM (copy only from this block into ONE Discord blockquote):")
+        print("<<<")
+        print(shown if shown else "(empty snippet)")
+        print(">>>")
+        print(f"ATTRIBUTION LINE (required under the quote):")
+        print(f"  — {title}")
+        print(f"  path: `{path}`")
+        print(f"════ END QUOTE UNIT #{i} ══════════════════════════════════════════")
         print()
+
+    print("REPLY CHECKLIST")
+    print("  □ Each Discord blockquote body came from exactly one VERBATIM block")
+    print("  □ Each quote followed by its SOURCE_PATH (and display title)")
+    print("  □ No stitching Unit A sentence + Unit B sentence into one quote")
+    print("  □ Any summary labeled paraphrase: (not as a quote)")
+    print()
 
     if total_pages > page_n:
         print(f"➡️  Next page: ./search.py {query!r} {limit} {filt} -p {page_n + 1}")
