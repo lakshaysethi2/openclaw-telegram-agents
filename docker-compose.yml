@@ -104,6 +104,56 @@ services:
       retries: 5
       start_period: 20s
 
+  agent-3:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    container_name: openclaw-agent-3
+    env_file:
+      - agents/agent-3/.env
+    environment:
+      HOME: /home/node
+      OPENCLAW_HOME: /home/node
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_CONFIG_DIR: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_DISABLE_BONJOUR: "1"
+      TZ: UTC
+    volumes:
+      - ./agents/agent-3/state:/home/node/.openclaw
+      - ./agents/agent-3/workspace:/home/node/.openclaw/workspace
+      - ./agents/agent-3/auth:/home/node/.config/openclaw
+    ports:
+      - "18793:18789"
+    networks:
+      - agent_3_net
+    init: true
+    restart: unless-stopped
+    cap_drop:
+      - NET_RAW
+      - NET_ADMIN
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - node
+      - dist/index.js
+      - gateway
+      - --bind
+      - lan
+      - --port
+      - "18789"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 networks:
 
   agent_1_net:
@@ -112,4 +162,8 @@ networks:
 
   agent_2_net:
     name: openclaw-agent-2-net
+    driver: bridge
+
+  agent_3_net:
+    name: openclaw-agent-3-net
     driver: bridge

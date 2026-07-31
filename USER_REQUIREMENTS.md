@@ -21,7 +21,7 @@ only over Telegram bot-to-bot messaging. Default bootstrap is 2 agents
    `sessions_list` / `sessions_history`.
 4. No real tokens in git. Placeholders only in committed files.
    Also never commit real Telegram user ids, bot ids, group chat ids, or bot usernames.
-   Live `agents/*/state/openclaw.json` and `agents/stack-public.json` stay local/gitignored.
+   Live `agents/*/state/openclaw.json`, `agents/*/workspace/**` (including IDENTITY.md), and `agents/stack-public.json` stay local/gitignored.
 5. No automatic live Telegram send on compose build/start.
 6. Do not invent OpenClaw keys (`botToBot`, Telegram `allowBots`).
 7. No wildcard Telegram allowlists.
@@ -43,7 +43,7 @@ Interactive `make setup` / `setup_agents.py` must ask:
 4. If DeepSeek: API key (hidden), same-settings-for-all?, default model choice,
    max context window tokens (default 128000, max 1000000)
 5. Telegram bot token per agent
-6. Optional short persona/role per agent (IDENTITY.md)
+6. Optional short persona/role per agent (live `workspace/IDENTITY.md`, gitignored; public samples in `agents/templates/`)
 7. Redacted summary + confirm before write
 
 It should resolve bot ids via `getMe` when network allows, write compose + agent

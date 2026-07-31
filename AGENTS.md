@@ -48,7 +48,8 @@ Human operators and smaller AI agents should be able to `git pull` and run
 ├── lib_*.py                 # small libraries, typed + documented
 ├── tests/                   # pytest
 ├── docker-compose.yml       # GENERATED
-└── agents/agent-N/          # per-agent state, workspace, auth, .env
+├── agents/templates/        # public-safe IDENTITY examples only
+└── agents/agent-N/          # per-agent dirs; live secrets/workspace gitignored
 ```
 
 Do **not** create deep package hierarchies unless necessary.
@@ -145,3 +146,23 @@ Error messages must include:
 - Shared message bus / Redis / MQTT between containers
 - Automatic delegation workflows beyond manual transport test
 - Host-network mode or privileged containers
+
+
+## Public repo / secrets
+
+Assume GitHub is public.
+
+**Never commit:**
+- `agents/*/.env`
+- live `agents/*/state/openclaw.json`
+- anything under `agents/*/workspace/` (especially personal `IDENTITY.md`)
+- `agents/stack-public.json`
+
+**Do commit:**
+- `*.example` placeholders
+- `agents/templates/*.IDENTITY.md.example`
+- generators/tests/docs
+- `docker-compose.yml` without secrets
+
+Live identity stays in gitignored `workspace/IDENTITY.md`. Public persona samples
+belong under `agents/templates/`.

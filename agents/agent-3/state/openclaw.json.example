@@ -1,0 +1,83 @@
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "auth": {
+      "mode": "token"
+    },
+    "controlUi": {
+      "allowedOrigins": [
+        "http://127.0.0.1:18793",
+        "http://localhost:18793"
+      ]
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "/home/node/.openclaw/workspace",
+      "heartbeat": {
+        "every": "0m"
+      },
+      "model": {
+        "primary": "deepseek/deepseek-v4-flash"
+      },
+      "contextTokens": 128000
+    }
+  },
+  "channels": {
+    "defaults": {
+      "botLoopProtection": {
+        "enabled": true,
+        "maxEventsPerWindow": 20,
+        "windowSeconds": 60,
+        "cooldownSeconds": 60
+      }
+    },
+    "discord": {
+      "enabled": true,
+      "token": {
+        "source": "env",
+        "provider": "default",
+        "id": "DISCORD_BOT_TOKEN"
+      },
+      "dmPolicy": "pairing",
+      "groupPolicy": "allowlist",
+      "guilds": {
+        "YOUR_DISCORD_GUILD_ID": {
+          "requireMention": true
+        }
+      }
+    },
+    "telegram": {
+      "enabled": false,
+      "dmPolicy": "allowlist",
+      "allowFrom": [
+        "YOUR_TELEGRAM_USER_ID",
+        "PEER_BOT_NUMERIC_ID"
+      ],
+      "groupPolicy": "allowlist",
+      "groups": {
+        "AUDIT_GROUP_CHAT_ID": {
+          "requireMention": true,
+          "allowFrom": [
+            "YOUR_TELEGRAM_USER_ID",
+            "PEER_BOT_NUMERIC_ID"
+          ]
+        }
+      },
+      "historyLimit": 0
+    }
+  },
+  "tools": {
+    "deny": [
+      "conversations_send",
+      "conversations_turn"
+    ],
+    "sessions": {
+      "visibility": "agent"
+    },
+    "agentToAgent": {
+      "enabled": false
+    }
+  }
+}

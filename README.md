@@ -74,10 +74,9 @@ make health     # gateways live; Telegram channel will 404 until real tokens
 ## Architecture
 
 ```text
-agent-1 (port 18789, net openclaw-agent-1-net)
-    |  Telegram Bot API only
-agent-2 (port 18790, net openclaw-agent-2-net)
-    |  optional more agents: agent-3 @ 18791, ...
+agent-1 (host port 18791, net openclaw-agent-1-net)  Telegram
+agent-2 (host port 18792, net openclaw-agent-2-net)  Telegram
+agent-3 (host port 18793, net openclaw-agent-3-net)  Discord (+ optional Telegram A2A)
 ```
 
 Hard isolation:
@@ -92,11 +91,13 @@ Hard isolation:
 
 | Path | Role |
 |------|------|
-| `.env` | Root image pin (`OPENCLAW_IMAGE`) |
-| `agents/agent-N/.env` | `TELEGRAM_BOT_TOKEN`, `OPENCLAW_GATEWAY_TOKEN`, provider keys |
-| `agents/agent-N/state/openclaw.json` | OpenClaw JSON5 config |
-| `agents/agent-N/workspace/` | Agent workspace / identity |
-| `agents/agent-N/auth/` | Auth-profile secrets dir |
+| `.env` | Root image pin (`OPENCLAW_IMAGE`) — gitignored when present |
+| `agents/agent-N/.env` | Secrets (`TELEGRAM_BOT_TOKEN` / `DISCORD_BOT_TOKEN`, gateway token, provider keys) — **gitignored** |
+| `agents/agent-N/state/openclaw.json` | Live OpenClaw config — **gitignored** (contains allowlist ids) |
+| `agents/agent-N/state/openclaw.json.example` | Public placeholder config only |
+| `agents/agent-N/workspace/` | Live workspace / identity / memory — **gitignored** |
+| `agents/templates/*.IDENTITY.md.example` | Public-safe identity templates |
+| `agents/agent-N/auth/` | Auth-profile secrets dir — **gitignored** except `.gitkeep` |
 
 ### `.env` keys (per agent)
 
@@ -176,3 +177,35 @@ Update that file when behavior changes.
 - OpenClaw Telegram: https://docs.openclaw.ai/channels/telegram
 - Bot loop protection: https://docs.openclaw.ai/channels/bot-loop-protection
 - Image: `ghcr.io/openclaw/openclaw:latest`
+
+
+## What must never be committed
+
+This repo is public. Keep secrets and private operator notes **local only**:
+
+- `agents/*/.env` (bot tokens, gateway tokens, API keys)
+- `agents/*/state/openclaw.json` (live allowlists / guild ids / user ids)
+- `agents/*/workspace/**` including live `IDENTITY.md` (may contain private persona notes)
+- `agents/stack-public.json` (operator metadata from setup)
+
+Commit only placeholders: `*.example`, `.gitkeep`, and generated `docker-compose.yml` without secrets.
+
+If private content is committed by mistake: rotate tokens, scrub git history, force-push carefully.
+
+## Optional agent-3 (Friend Bot / Discord)
+
+Default setup still works with 2 Telegram agents. This tree also includes an optional
+**agent-3** Discord community bot skeleton:
+
+1. Copy `agents/agent-3/.env.example` → `agents/agent-3/.env` and fill:
+   - `DISCORD_BOT_TOKEN`
+   - `OPENCLAW_GATEWAY_TOKEN`
+   - provider key (e.g. `DEEPSEEK_API_KEY`)
+   - optional `TELEGRAM_BOT_TOKEN` if it should join the A2A mesh
+2. Copy `agents/agent-3/state/openclaw.json.example` → `agents/agent-3/state/openclaw.json`
+3. Set your real Discord guild id in `channels.discord.guilds`
+4. Copy a starting persona:
+   `cp agents/templates/agent-3.IDENTITY.md.example agents/agent-3/workspace/IDENTITY.md`
+5. Start only that service: `docker compose up -d agent-3`
+
+Discord bot needs Message Content + Server Members intents, and must be invited to the guild.
