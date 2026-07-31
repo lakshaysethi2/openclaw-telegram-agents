@@ -26,7 +26,13 @@ def _model_defaults_block(agent: AgentSpec) -> str:
     """Render optional model + contextTokens inside agents.defaults."""
     lines: list[str] = [
         'workspace: "/home/node/.openclaw/workspace",',
+        # Heartbeat off for every agent by default (no periodic API/chat noise).
         'heartbeat: { every: "0m" },',
+        # Final answers only — hide thinking/tool chatter in chat UIs.
+        'verboseDefault: "off",',
+        'reasoningDefault: "off",',
+        'thinkingDefault: "off",',
+        'blockStreamingDefault: "off",',
     ]
     if agent.model_primary:
         lines.append(f'model: {{ primary: "{agent.model_primary}" }},')
@@ -126,6 +132,14 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
                   ],
                 }},
               }},
+              // Final-only replies: no partial draft edits / tool-progress spam.
+              streaming: {{
+                mode: "off",
+              }},
+              heartbeat: {{
+                showOk: false,
+                showAlerts: false,
+              }},
               historyLimit: 0,
             }},"""
         )
@@ -147,6 +161,14 @@ def render_openclaw_json(stack: StackSpec, agent: AgentSpec) -> str:
                 "{guild_id}": {{
                   requireMention: true,
                 }},
+              }},
+              // Final-only replies (no thinking / tool-progress drafts).
+              streaming: {{
+                mode: "off",
+              }},
+              heartbeat: {{
+                showOk: false,
+                showAlerts: false,
               }},
             }},"""
         )

@@ -59,7 +59,8 @@ dirs + live `.env` files (including `DEEPSEEK_API_KEY` when chosen), set
 - Service/dir names: `agent-1` .. `agent-N`
 - Networks: `openclaw-agent-N-net` (one each)
 - Healthcheck: `/healthz`
-- Heartbeat: `every: "0m"`
+- Heartbeat: `every: "0m"` (disabled for all agents; keep disabled for new agents)
+- Quiet Telegram/Discord: streaming mode `off` + verbose/reasoning/thinking off (final answers only)
 - tools.sessions.visibility: `agent` (own sessions visible across DM/group)
 - tools.agentToAgent.enabled: false
 - tools.deny: conversations_send, conversations_turn

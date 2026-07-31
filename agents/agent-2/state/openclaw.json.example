@@ -17,7 +17,11 @@
       "workspace": "/home/node/.openclaw/workspace",
       "heartbeat": {
         "every": "0m"
-      }
+      },
+      "verboseDefault": "off",
+      "reasoningDefault": "off",
+      "thinkingDefault": "off",
+      "blockStreamingDefault": "off"
     }
   },
   "channels": {
@@ -46,7 +50,14 @@
           ]
         }
       },
-      "historyLimit": 0
+      "historyLimit": 0,
+      "streaming": {
+        "mode": "off"
+      },
+      "heartbeat": {
+        "showOk": false,
+        "showAlerts": false
+      }
     }
   },
   "tools": {

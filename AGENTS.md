@@ -96,7 +96,9 @@ If you change rendered output, update unit tests in `tests/` in the same change.
 - Health: `GET /healthz` -> `{"ok":true,"status":"live"}`
 - `agents.entries.*.identity` was **rejected** by config validation; identity
   lives in `workspace/IDENTITY.md`.
-- Heartbeat off: `agents.defaults.heartbeat.every: "0m"`
+- Heartbeat off: `agents.defaults.heartbeat.every: "0m"` (default for all new agents)
+- Quiet chat defaults: `verboseDefault`/`reasoningDefault`/`thinkingDefault`/`blockStreamingDefault` = `off`
+- Channel streaming final-only: `channels.telegram|discord.streaming.mode: "off"` (no thinking/tool drafts)
 - Gateway token via env `OPENCLAW_GATEWAY_TOKEN`
 - Telegram token via env `TELEGRAM_BOT_TOKEN`
 - DeepSeek: env `DEEPSEEK_API_KEY`, model refs `deepseek/deepseek-v4-flash` or

@@ -53,6 +53,19 @@ def test_openclaw_json_allowlist_peers_and_owner() -> None:
     assert "entries:" not in text
 
 
+def test_openclaw_json_quiet_chat_and_heartbeat_off() -> None:
+    """New agents default to final-only chat delivery and disabled heartbeats."""
+    stack = _stack()
+    text = render_openclaw_json(stack, stack.agents[0])
+    assert 'heartbeat: { every: "0m" }' in text
+    assert 'verboseDefault: "off"' in text
+    assert 'reasoningDefault: "off"' in text
+    assert 'thinkingDefault: "off"' in text
+    assert 'blockStreamingDefault: "off"' in text
+    assert 'mode: "off"' in text  # channels.telegram.streaming.mode
+    assert "showOk: false" in text
+
+
 def test_openclaw_json_denies_internal_a2a_tools() -> None:
     """Cross-agent bus tools stay denied; own-session visibility is agent-wide."""
     stack = _stack()
