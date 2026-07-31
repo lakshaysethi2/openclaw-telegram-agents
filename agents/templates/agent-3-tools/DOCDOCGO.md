@@ -86,8 +86,11 @@ Prefer **limit 10** — never request fewer than 10 (tool floors to 10).
   `path:`). One search (limit 10) returns ≥10 units; pull page 2 or more
   phrasings until you have N. Never stop at 2–3.
 - Quote with **real context**: `./search.py "<phrase>" 10 -c 900 -w 600`.
-- **Text + TTS together**: attach `./tts.py "<verbatim text>"` for the focal
-  quote. No TTS = incomplete delivery when quotes were asked for.
+- **Text + TTS together — mandatory**: attach `./tts.py "<verbatim text>"`
+  for the focal quote. No TTS = incomplete delivery, always. Never ask
+  "want the TTS audio?" — **default is yes, just deliver.**
+- **Never ask permission questions** ("want more?", "want me to search?",
+  "want TTS?"). Deliver first, then a plain statement.
 
 ---
 
