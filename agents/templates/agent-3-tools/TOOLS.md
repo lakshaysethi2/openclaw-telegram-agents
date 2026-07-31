@@ -19,7 +19,17 @@
 ## GitHub
 ```bash
 ./gh.sh project view 1 --owner lakshaysethi2
+./gh.sh project item-list 1 --owner lakshaysethi2
+./gh.sh project item-list 1 --owner lakshaysethi2 | head -n 50
 ```
+
+**`item-list` IS allowed** — an earlier "allowlist miss" was caused by `2>&1` in
+the command, not by the subcommand. Rules:
+- **Never use `2>&1`** in exec commands — it makes the whole command an allowlist
+  miss. Tool stderr is captured automatically.
+- Pipes are fine with allowlisted bins: `| head -n N`, `| tail -n N`, `| cat`,
+  `| jq '...'`. Use `head -n N` (not `head -N`).
+- Keep the repo/owner flags: `1 --owner lakshaysethi2`.
 
 ## TTS / Giphy
 ```bash
