@@ -13,7 +13,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-API = "https://docdocgo.lak.nz/api/search"
+# Replace with your docdocgo search API endpoint
+API = "https://<your-search-api>/api/search"
 UA = "FriendBot-docdocgo/2.3 (+search-only; plain-text-quotes)"
 VALID_FILTERS = {"all", "books", "all-hawkins-books", "lectures"}
 FILTER_HINTS = {

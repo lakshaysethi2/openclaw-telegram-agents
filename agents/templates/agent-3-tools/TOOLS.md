@@ -8,10 +8,10 @@
 ./search.py "forgiveness" 10 lectures -c 500 -w 300
 ./search.py "ego" 10 --partial
 ```
-- Endpoint: **only** `GET https://docdocgo.lak.nz/api/search`
+- Endpoint: **only** `GET https://<your-search-api>/api/search`
 - Output = plain-text **UNITs** (one `SOURCE_PATH` each) — **never images**
 - Default **limit=10** (min 10 — never fewer; max 25)
-- Guide: `DOCDOCGO.md` · https://github.com/friend-bot-dnd/docdocgo-api-guide
+- Guide: `DOCDOCGO.md`
 - Do **not** call `/api/read`, `/api/rag`, `/api/files`
 - Quoting: one unit → one blockquote + `path:`; no stitch; paraphrase labeled
 - Strip `[[` `]]` highlight markers when pasting quotes

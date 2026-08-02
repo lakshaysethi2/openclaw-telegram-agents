@@ -1,9 +1,7 @@
 # DOCDOCGO.md — Search only + perfect quoting
 
-**You may only use** `GET https://docdocgo.lak.nz/api/search` via `./search.py`.  
+**You may only use** `GET https://<your-search-api>/api/search` via `./search.py`.  
 Do **not** call `/api/read`, `/api/rag`, or `/api/files`.
-
-Field guide: https://github.com/friend-bot-dnd/docdocgo-api-guide
 
 ---
 
