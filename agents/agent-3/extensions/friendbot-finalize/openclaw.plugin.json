@@ -1,0 +1,14 @@
+{
+  "id": "friendbot-finalize",
+  "name": "Friend Bot finalize enforcement",
+  "description": "Run-level gate: quote deliveries must run search.py this turn and carry >=10 path: citations; final replies must not narrate the process",
+  "activation": {
+    "onStartup": true
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "version": "1.0.0"
+}

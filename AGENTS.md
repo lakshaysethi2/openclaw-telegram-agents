@@ -89,6 +89,33 @@ make doctor
 
 If you change rendered output, update unit tests in `tests/` in the same change.
 
+## Agent-3 (Friend Bot) is hand-configured, NOT generated
+
+`generate_stack.py` deliberately has **no** `--friend-bot` branch (removed
+2026-08): a generated agent-3 config would lack the delivery plugins, the
+exec allowlist, and the Discord channel config the live bot needs, so
+regenerating it would produce an unguarded bot. Agent-3's live config lives in
+gitignored `agents/agent-3/{state,workspace}` on the deploy host; do not
+try to regenerate it.
+
+### Agent-3 delivery enforcement layer (plugins in `state/extensions/`)
+
+The live bot loads these delivery plugins (auto-discovered from
+`state/extensions/*/openclaw.plugin.json`):
+
+- `friendbot-safe` - neutralizes all @-mentions at delivery
+- `friendbot-english` - English-only belt
+- `friendbot-noask` - strips permission asks at delivery
+- `friendbot-finalize` - run-level gate via the `before_agent_finalize` hook:
+  quote deliveries must run `search.py` in the same turn and carry >=10
+  `path:` citations; final replies must not narrate the process. Bounded:
+  at most 3 revisions per run, each rule has its own `maxAttempts`.
+
+Plugin sources are mirrored in `agents/agent-3/extensions/` (committed,
+public-safe); deploy = copy to live `state/extensions/` + restart. Probe:
+`node agents/agent-3/extensions/friendbot-finalize/test.mjs` (wired into
+pytest as `tests/test_friendbot_finalize.py`).
+
 ## OpenClaw compatibility notes (verified 2026.6.34)
 
 - Image: `ghcr.io/openclaw/openclaw:latest`
@@ -103,6 +130,11 @@ If you change rendered output, update unit tests in `tests/` in the same change.
 - Telegram token via env `TELEGRAM_BOT_TOKEN`
 - DeepSeek: env `DEEPSEEK_API_KEY`, model refs `deepseek/deepseek-v4-flash` or
   `deepseek/deepseek-v4-pro`, runtime cap `agents.defaults.contextTokens`
+- Harness hooks (plugin SDK): `before_agent_finalize` accepts
+  `{action:"revise", retryCandidates:[{instruction,maxAttempts}]}` to force one
+  more model pass before a natural final reply ships (max 3 per run; skipped
+  when the run had deterministic side effects). `message_sending` /
+  `reply_payload_sending` mutate the outbound text.
 
 ## Allowlist rules
 
@@ -112,6 +144,13 @@ For agent K, `channels.telegram.allowFrom` must contain:
 - numeric bot ids of **every other** agent (from `getMe` -> `result.id`)
 
 Outbound peer targeting uses `@bot_username`, not numeric id.
+
+## Maintaining this file
+
+Update this file when the repo layout, generator behavior, or agent-3 deploy
+path changes. Keep it a pointer-file: authoritative detail lives in
+`README.md`, `USER_REQUIREMENTS.md`, and the live agent-3 state on the deploy
+host.
 
 ## Success stages for A2A (never collapse these)
 

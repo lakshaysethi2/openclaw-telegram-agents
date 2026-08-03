@@ -5,7 +5,10 @@ Writes docker-compose.yml, agent dirs, env examples, openclaw.json, IDENTITY.md.
 
 Example:
     python generate_stack.py --agents 2 --owner-id 123456789
-    python generate_stack.py --friend-bot --owner-id 123456789
+
+Note: agent-3 (Friend Bot, Discord) is HAND-CONFIGURED and NOT generated.
+Its live config/plugins/workspace live under agents/agent-3/ (gitignored) and
+are not reproducible from this generator - see AGENTS.md.
 """
 
 from __future__ import annotations
@@ -49,27 +52,22 @@ def build_default_stack(
     tokens: list[str] | None = None,
     bot_ids: list[str] | None = None,
     write_live_env: bool = False,
-    friend_bot: bool = False,
 ) -> StackSpec:
     """Build a StackSpec with placeholders or provided tokens/ids.
 
     Args:
-        agent_count: Number of agents (>= 2). Ignored when friend_bot is True
-            (always 3: two Telegram agents + Discord Friend Bot).
+        agent_count: Number of agents (>= 2).
         owner_telegram_id: Human numeric Telegram id or placeholder.
         base_port: Host port for agent-1.
         openclaw_image: Container image.
         tokens: Optional per-agent Telegram bot tokens.
         bot_ids: Optional per-agent numeric bot ids.
         write_live_env: Unused here; retained for call-site clarity.
-        friend_bot: When True, build the 3-agent Friend Bot layout.
 
     Returns:
         Validated StackSpec.
     """
     _ = write_live_env
-    if friend_bot:
-        agent_count = max(agent_count, 3)
     agents: list[AgentSpec] = []
     for i in range(1, agent_count + 1):
         name = agent_slug(i)
@@ -83,17 +81,6 @@ def build_default_stack(
             if bot_ids and i - 1 < len(bot_ids)
             else f"REPLACE_WITH_{name.upper().replace('-', '_')}_BOT_NUMERIC_ID"
         )
-        channels: tuple[str, ...] = ("telegram",)
-        persona = ""
-        discord_token = ""
-        if friend_bot and i == 3:
-            channels = ("discord", "telegram")
-            persona = "Friend Bot for Discord community"
-            discord_token = f"REPLACE_WITH_{name.upper().replace('-', '_')}_DISCORD_BOT_TOKEN"
-        image = ""
-        if friend_bot and i == 3:
-            # Local build with ffmpeg for voice/media delivery.
-            image = "openclaw-agent-3:local-ffmpeg"
         agents.append(
             AgentSpec(
                 index=i,
@@ -102,10 +89,6 @@ def build_default_stack(
                 telegram_bot_token=token,
                 gateway_token=secrets.token_urlsafe(24),
                 bot_numeric_id=bot_id,
-                persona=persona,
-                channels=channels,
-                discord_bot_token=discord_token,
-                image=image,
             )
         )
     return StackSpec(
@@ -291,11 +274,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Also write agents/*/.env (gitignored).",
     )
-    parser.add_argument(
-        "--friend-bot",
-        action="store_true",
-        help="Include agent-3 Friend Bot (Discord + optional Telegram) layout.",
-    )
     parser.add_argument("--root", default="", help="Optional output root (tests).")
     return parser.parse_args(argv)
 
@@ -313,7 +291,6 @@ def main(argv: list[str] | None = None) -> int:
             base_port=base_port,
             openclaw_image=args.image,
             write_live_env=bool(args.write_live_env),
-            friend_bot=bool(args.friend_bot),
         )
         root = Path(args.root).resolve() if args.root else None
         written = write_stack_files(stack, root=root, write_live_env=bool(args.write_live_env))

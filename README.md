@@ -61,7 +61,6 @@ make health     # gateways live; Telegram channel will 404 until real tokens
 |--------|---------|
 | `make setup` | Interactive configure |
 | `make generate` | Non-interactive 2-agent placeholders |
-| `make generate-friend-bot` | 2 Telegram agents + Discord Friend Bot placeholders |
 | `make up` / `make down` | Start/stop stack |
 | `make ps` / `make logs` | Status / logs (`SERVICE=agent-1`) |
 | `make health` | Probe `/healthz` on published ports |

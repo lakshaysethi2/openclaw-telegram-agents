@@ -97,6 +97,22 @@ Optional audit group key may remain placeholder until operator replaces it.
 - [ ] Live Telegram ok:true (manual; real tokens)
 - [ ] Inbound processing on peer (manual)
 
+## Friend Bot (agent-3) — not generated, enforced at delivery
+
+Agent-3 (Discord Friend Bot, deepseek-v4-flash) is **hand-configured**; the
+generator has no friend-bot branch (an unguarded config would be worse than
+none). Its guardrails are enforced by delivery plugins in live
+`agents/agent-3/state/extensions/`, mirrored in `agents/agent-3/extensions/`:
+
+- search-first + min-10-quotes + no-narration: `friendbot-finalize`
+  (`before_agent_finalize` hook; quote deliveries must run `search.py` in the
+  same turn and carry >=10 `path:` citations; no process narration)
+- permission-ask stripping: `friendbot-noask` · mentions: `friendbot-safe` ·
+  English-only: `friendbot-english`
+- exec allowlist contract: the 4 workspace scripts (`search.py`, `tts.py`,
+  `giphy.py`, `gh.sh`) + static `bin/gh`/`bin/rg` + `.venv` binaries only;
+  `curl`/`grep`/`cat`/`ls`/`find`/etc. are not approved
+
 ## Out of scope
 
 - Automatic multi-step delegation frameworks

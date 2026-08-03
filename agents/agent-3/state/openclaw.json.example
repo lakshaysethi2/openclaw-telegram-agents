@@ -50,7 +50,7 @@ models: {
               workspace: "/home/node/.openclaw/workspace",
               heartbeat: { every: "0m" },
               model: { primary: "deepseek/deepseek-v4-flash" },
-              contextTokens: 128000,
+              contextTokens: 200000,
             },
           },
 
@@ -122,5 +122,35 @@ models: {
               "conversations_send",
               "conversations_turn"
             ],
+          },
+
+          // Delivery enforcement layer - these plugin ids must match
+          // state/extensions/*/openclaw.plugin.json. Non-bundled plugins that
+          // register conversation-access hooks (before_agent_finalize) must set
+          // hooks.allowConversationAccess=true.
+          plugins: {
+            entries: {
+              "friendbot-safe": { enabled: true },
+              "friendbot-english": { enabled: true },
+              "friendbot-noask": { enabled: true },
+              "friendbot-finalize": {
+                enabled: true,
+                hooks: { allowConversationAccess: true },
+              },
+            },
+            allow: [
+              "friendbot-safe",
+              "friendbot-english",
+              "friendbot-noask",
+              "friendbot-finalize",
+            ],
+            load: {
+              paths: [
+                "/home/node/.openclaw/extensions/friendbot-safe",
+                "/home/node/.openclaw/extensions/friendbot-english",
+                "/home/node/.openclaw/extensions/friendbot-noask",
+                "/home/node/.openclaw/extensions/friendbot-finalize",
+              ],
+            },
           },
         }

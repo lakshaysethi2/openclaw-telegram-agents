@@ -121,27 +121,3 @@ def test_prompt_stack_skip_llm() -> None:
     assert stack.llm_provider == ""
     assert stack.agents[0].model_primary == ""
     assert stack.agents[0].provider_api_key == ""
-
-
-def test_friend_bot_layout(tmp_path) -> None:
-    """--friend-bot materializes agent-3 Discord skeleton files."""
-    from generate_stack import build_default_stack, write_stack_files
-
-    stack = build_default_stack(
-        agent_count=2,
-        owner_telegram_id="42",
-        base_port=18791,
-        friend_bot=True,
-    )
-    assert len(stack.agents) == 3
-    assert stack.agents[2].uses_discord()
-    written = write_stack_files(stack, root=tmp_path, write_live_env=False)
-    paths = {str(p.relative_to(tmp_path)) for p in written}
-    assert "docker-compose.yml" in paths
-    assert "agents/agent-3/state/openclaw.json" in paths
-    assert "agents/agent-3/state/openclaw.json.example" in paths
-    assert "agents/agent-3/.env.example" in paths
-    example = (tmp_path / "agents/agent-3/.env.example").read_text()
-    assert "DISCORD_BOT_TOKEN=" in example
-    cfg = (tmp_path / "agents/agent-3/state/openclaw.json").read_text()
-    assert "discord:" in cfg
